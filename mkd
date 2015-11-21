@@ -46,7 +46,7 @@ fi
 makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | cut -c11-`"
 if [ -z "$makedir" ]
 then
-    echo "make directory not found, make args:[$*], not exit" >&2
+    echo "make directory not found, make args:[$*]" >&2
     exit 1
 fi
 
@@ -54,7 +54,7 @@ fi
 make $* $targets
 if [ $? -ne 0 ]
 then
-    echo "make fail, make args:[$* $targets], now exit" >&2
+    echo "make fail, make args:[$* $targets]" >&2
     exit 1
 fi
 
@@ -81,7 +81,7 @@ do
             | awk '{print $1}'`
     if [ -z "$module" ]
     then
-        echo "module not found, target:[$target], now exit" >&2
+        echo "module not found, target:[$target]" >&2
         exit 1
     fi 
 
