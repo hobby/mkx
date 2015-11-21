@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mkd
-#     mkd [ -f makefile ] [ targets ] ...
+#     mkd [ -f makefile ] [ -C directory ] [ targets ] ...
 # 
 #     debug=on mkd ...
 #
@@ -20,7 +20,8 @@
 #
 # VERSION
 #     2015/11/21: 支持命令行或者makefile中OUTPUT定义的target
-#                 支持-f选项指定当前目录的makefile
+#                 支持-f选项指定自定义makefile
+#                 支持-C选项指定自定义make目录
 #
 ############################################################
 
@@ -38,6 +39,14 @@ fi
 if [ -z "$targets" ]
 then
     echo "targets not found, make args:[$*]" >&2
+    exit 1
+fi
+
+# get make directory
+makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | cut -c11-`"
+if [ -z "$makedir" ]
+then
+    echo "make directory not found, make args:[$*], not exit" >&2
     exit 1
 fi
 
@@ -87,7 +96,7 @@ do
         echo "target:[$target], module:[$module]," \
              "username:[$username], rsa-private:[$rsapkey]," \
              "hostname:[$hostname], hostport:[$hostport]," \
-             "hostpath:[$hostpath]"
+             "hostpath:[$hostpath], makedir:[$makedir]"
      fi
      if [   -z "$username" -o -z "$rsapkey" \
          -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
@@ -97,5 +106,5 @@ do
      fi
 
     # do deploy
-    scp -C -i $rsapkey -P $hostport "$target" $username@$hostname:$hostpath
+    scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
 done
