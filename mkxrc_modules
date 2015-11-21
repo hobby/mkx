@@ -1,0 +1,4 @@
+# vim:ft=conf
+
+# module username rsa-private hostname port path
+mkx mkx /home/mkx/.ssh/id_rsa.mkx dev 22 /tmp/mkx/

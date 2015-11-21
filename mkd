@@ -1,0 +1,101 @@
+#!/bin/bash
+# vim:ts=4:sw=4:expandtab
+
+############################################################
+# NAME
+#     mkd - a toy for make and deploy targets.
+#
+# SYNOPSIS
+#     mkd
+#     mkd [ -f makefile ] [ targets ] ...
+# 
+#     debug=on mkd ...
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     mkxrc_targets
+#     mkxrc_modules
+#
+# VERSION
+#     2015/11/21: 支持命令行或者makefile中OUTPUT定义的target
+#                 支持-f选项指定当前目录的makefile
+#
+############################################################
+
+# target(*) <-----> module(1) <-----> deploy destination(1)
+mkxrc_targets=~/.mkxrc_targets
+mkxrc_modules=~/.mkxrc_modules
+
+# get targets from cmdline
+targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
+if [ -z "$targets" ]
+then
+    # default targets from OUTPUT var in makefile
+    targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
+fi
+if [ -z "$targets" ]
+then
+    echo "targets not found, make args:[$*]" >&2
+    exit 1
+fi
+
+# make targets
+make $* $targets
+if [ $? -ne 0 ]
+then
+    echo "make fail, make args:[$* $targets], now exit" >&2
+    exit 1
+fi
+
+# deploy targets
+for target in $targets
+do
+    # .so target is specail
+    if expr match "$target" ".*\.so$" >/dev/null 2>&1 ; then
+        if ! expr match "$target" "^lib" >/dev/null 2>&1 ; then
+            target="lib$target"
+        fi
+    fi
+    # .a target is specail
+    if expr match "$target" ".*\.a$" >/dev/null 2>&1 ; then
+        if ! expr match "$target" "^lib" >/dev/null 2>&1 ; then
+            target="lib$target"
+        fi
+    fi
+
+    # find target's module
+    module=`grep -v -E "^#|^$" $mkxrc_targets 2>/dev/null \
+            | grep -w "$target" \
+            | tail -n1 \
+            | awk '{print $1}'`
+    if [ -z "$module" ]
+    then
+        echo "module not found, target:[$target], now exit" >&2
+        exit 1
+    fi 
+
+    # load module's info
+    eval `grep -v -E "^#|^$" $mkxrc_modules 2>/dev/null \
+          | grep -w "^$module" 2>/dev/null \
+          | tail -n1 \
+          | awk '{printf "username=%s; rsapkey=%s; hostname=%s; hostport=%s; hostpath=%s" \
+                        ,         $2,         $3,          $4,          $5,          $6}'`
+    if [ -n "$debug" ]
+    then
+        echo "target:[$target], module:[$module]," \
+             "username:[$username], rsa-private:[$rsapkey]," \
+             "hostname:[$hostname], hostport:[$hostport]," \
+             "hostpath:[$hostpath]"
+     fi
+     if [   -z "$username" -o -z "$rsapkey" \
+         -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
+     then
+         echo "module not found, target:[$target], module:[$module]" >&2
+         exit 1
+     fi
+
+    # do deploy
+    scp -C -i $rsapkey -P $hostport "$target" $username@$hostname:$hostpath
+done

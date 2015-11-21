@@ -1,0 +1,5 @@
+# vim:ft=conf
+
+# module target ...
+mkx target1 target2
+mkx targeta targetb
