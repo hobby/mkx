@@ -1,0 +1,46 @@
+#!/bin/bash
+# vim:ts=4:sw=4:expandtab
+
+############################################################
+# NAME
+#     mklog - a toy for output mkx's log.
+#
+# SYNOPSIS
+#     mkdd error|normal|debug message ...
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# VERSION
+#     2015/11/21: 简单支持日志按优化级高亮输出
+#                 error  -> STDERR(红色)
+#                 normal -> STDOUT(绿色)
+#                 debug  -> STDOUT(黄色)
+#
+############################################################
+
+function normaltext()  { echo -n  "$*"; } 
+function redtext()     { echo -en "\e[31;1m$*\e[0m"; }
+function greentext()   { echo -en "\e[32;1m$*\e[0m"; }
+function pinktext()    { echo -en "\e[35;1m$*\e[0m"; }
+function yellowtext()  { echo -en "\e[33;1m$*\e[0m"; }
+
+if [ $# -lt 2 ]
+then
+    echo "usage: $0 error|normal|debug message ..." >&2
+    exit 1
+fi
+
+type="$1"
+shift 1
+
+if [ "$type" = "error" ]
+then
+    echo "`redtext $*`" >&2
+elif [ "$type" = "normal" ]
+then
+    echo "`greentext $*`"
+elif [ "$type" = "debug" ]
+then
+    echo "`yellowtext $*`"
+fi

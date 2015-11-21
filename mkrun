@@ -32,7 +32,7 @@ mkxrc_modules=~/.mkxrc_modules
 
 if [ $# -lt 2 ]
 then
-    echo "usage: $0 start|stop|restart targets ..." >&2
+    mklog error "usage: $0 start|stop|restart targets ..."
     exit 1
 fi
 
@@ -41,8 +41,8 @@ if [   "$type" != "start" \
     -a "$type" != "stop"  \
     -a "$type" != "restart" ]
 then
-    echo "unknow command type, type:[$type]," \
-         "supported type:[start, stop, restart]" >&2
+    mklog error "unknow command type, type:[$type]," \
+                "supported type:[start, stop, restart]"
     exit 1
 fi
 shift 1
@@ -61,16 +61,16 @@ do
             done` >/dev/null 2>&1
     if [ $? -ne 0 ]
     then
-        echo "load $type command fail, target:[$target]" >&2
+        mklog error "load $type command fail, target:[$target]"
         continue
     fi 
     if [ -n "$debug" ]
     then
-        echo "target:[$target], type:[$type], command:[$command]"
+        mklog debug "target:[$target], type:[$type], command:[$command]"
     fi
     if [   -z "$type" -o -z "$command" ]
     then
-        echo "$type command not found, target:[$target]" >&2
+        mklog error "$type command not found, target:[$target]"
         continue
     fi
 
@@ -81,7 +81,7 @@ do
             | awk '{print $1}'`
     if [ -z "$module" ]
     then
-        echo "module not found, target:[$target]" >&2
+        mklog error "module not found, target:[$target]"
         exit 1
     fi 
 
@@ -93,18 +93,18 @@ do
                          ,         $2,         $3,          $4,          $5}'`
     if [ -n "$debug" ]
     then
-        echo "target:[$target], module:[$module]," \
-             "username:[$username], rsa-private:[$rsapkey]," \
-             "hostname:[$hostname], hostport:[$hostport]"
-     fi
-     if [   -z "$username" -o -z "$rsapkey" \
-         -o -z "$hostname" -o -z "$hostport" ]
-     then
-         echo "module not found, target:[$target], module:[$module]" >&2
-         continue
-     fi
+        mklog debug "target:[$target], module:[$module]," \
+                    "username:[$username], rsa-private:[$rsapkey]," \
+                    "hostname:[$hostname], hostport:[$hostport]"
+    fi
+    if [   -z "$username" -o -z "$rsapkey" \
+        -o -z "$hostname" -o -z "$hostport" ]
+    then
+        mklog error "module not found, target:[$target], module:[$module]"
+        continue
+    fi
 
     # run command
-    echo "run $type command for '$target' with command:[$command]"
+    mklog normal "run $type command for '$target' with command:[$command]"
     ssh -i $rsapkey -p $hostport $username@$hostname "$command"
 done

@@ -28,7 +28,7 @@
 # i need mkrun
 if ! which mkrun >/dev/null 2>&1
 then
-    echo "mkrun not found"
+    mklog error "mkrun not found"
     exit 1
 fi
 
@@ -41,7 +41,7 @@ then
 fi
 if [ -z "$targets" ]
 then
-    echo "targets not found, make args:[$*]" >&2
+    mklog error "targets not found, make args:[$*]"
     exit 1
 fi
 

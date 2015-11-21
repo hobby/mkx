@@ -2,6 +2,7 @@
 OUTPUT = mk mkc \
          mkd mkdd \
          mkrun mks mkt mkr \
+         mklog \
 
 all:
 	@echo "Usage: make [install | clean]"

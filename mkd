@@ -38,7 +38,7 @@ then
 fi
 if [ -z "$targets" ]
 then
-    echo "targets not found, make args:[$*]" >&2
+    mklog error "targets not found, make args:[$*]"
     exit 1
 fi
 
@@ -46,7 +46,7 @@ fi
 makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | cut -c11-`"
 if [ -z "$makedir" ]
 then
-    echo "make directory not found, make args:[$*]" >&2
+    mklog error "make directory not found, make args:[$*]"
     exit 1
 fi
 
@@ -54,7 +54,7 @@ fi
 make $* $targets
 if [ $? -ne 0 ]
 then
-    echo "make fail, make args:[$* $targets]" >&2
+    mklog error "make fail, make args:[$* $targets]"
     exit 1
 fi
 
@@ -81,7 +81,7 @@ do
             | awk '{print $1}'`
     if [ -z "$module" ]
     then
-        echo "module not found, target:[$target]" >&2
+        mklog error "module not found, target:[$target]"
         exit 1
     fi 
 
@@ -93,17 +93,17 @@ do
                         ,         $2,         $3,          $4,          $5,          $6}'`
     if [ -n "$debug" ]
     then
-        echo "target:[$target], module:[$module]," \
-             "username:[$username], rsa-private:[$rsapkey]," \
-             "hostname:[$hostname], hostport:[$hostport]," \
-             "hostpath:[$hostpath], makedir:[$makedir]"
-     fi
-     if [   -z "$username" -o -z "$rsapkey" \
-         -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
-     then
-         echo "module not found, target:[$target], module:[$module]" >&2
-         exit 1
-     fi
+        mklog debug "target:[$target], module:[$module]," \
+                    "username:[$username], rsa-private:[$rsapkey]," \
+                    "hostname:[$hostname], hostport:[$hostport]," \
+                    "hostpath:[$hostpath], makedir:[$makedir]"
+    fi
+    if [   -z "$username" -o -z "$rsapkey" \
+        -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
+    then
+        mklog error "module not found, target:[$target], module:[$module]"
+        exit 1
+    fi
 
     # do deploy
     mkt $target
