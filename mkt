@@ -1,0 +1,49 @@
+#!/bin/bash
+# vim:ts=4:sw=4:expandtab
+
+############################################################
+# NAME
+#     mkt - a toy for run target's stop command
+#
+# SYNOPSIS
+#     mkt
+#     mkt [ -f makefile ] [ -C directory ] [ targets ] ...
+# 
+#     debug=on mkt ...
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     mkxrc_commands
+#     mkxrc_targets
+#     mkxrc_modules
+#
+# VERSION
+#     2015/11/21: 简单封装mkrun，支持关闭
+#                 命令行或者makefile中OUTPUT定义的target
+#
+############################################################
+
+# i need mkrun
+if ! which mkrun >/dev/null 2>&1
+then
+    echo "mkrun not found"
+    exit 1
+fi
+
+# get targets from cmdline
+targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
+if [ -z "$targets" ]
+then
+    # default targets from OUTPUT var in makefile
+    targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
+fi
+if [ -z "$targets" ]
+then
+    echo "targets not found, make args:[$*]" >&2
+    exit 1
+fi
+
+# run target's stop command
+mkrun stop $targets

@@ -106,5 +106,7 @@ do
      fi
 
     # do deploy
+    mkt $target
     scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
+    mkr $target
 done

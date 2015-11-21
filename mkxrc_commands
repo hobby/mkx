@@ -1,0 +1,6 @@
+# vim:ft=conf
+
+# target start   start-command without single-queto
+# target stop    stop-command without single-queto
+# target restart restart-command without single-queto
+

@@ -1,0 +1,110 @@
+#!/bin/bash
+# vim:ts=4:sw=4:expandtab
+
+##################################################################
+# NAME
+#     mkrun - a toy for run target's command
+#
+# SYNOPSIS
+#     mkrun
+#     mkrun start|stop|restart targets ... 
+# 
+#     debug=on mkrun ...
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     mkxrc_commands
+#     mkxrc_targets
+#     mkxrc_modules
+#
+# VERSION
+#     2015/11/21: 支持每个target指定类型的命令(start/stop/restart)
+#
+##################################################################
+
+# target(*) <-----> module(1)     <-----> destination(1)
+# target(1) <-----> command(stop)
+mkxrc_commands=~/.mkxrc_commands
+mkxrc_targets=~/.mkxrc_targets
+mkxrc_modules=~/.mkxrc_modules
+
+if [ $# -lt 2 ]
+then
+    echo "usage: $0 start|stop|restart targets ..." >&2
+    exit 1
+fi
+
+type="$1"
+if [   "$type" != "start" \
+    -a "$type" != "stop"  \
+    -a "$type" != "restart" ]
+then
+    echo "unknow command type, type:[$type]," \
+         "supported type:[start, stop, restart]" >&2
+    exit 1
+fi
+shift 1
+
+# run target's command with type
+for target in $*
+do
+    # find target's command
+    command=
+    eval `grep -v -E "^#|^$" $mkxrc_commands 2>/dev/null \
+          | grep "^$target[ $(echo $'\t')]*$type" \
+          | tail -n1 \
+          | while read target type command
+            do
+                echo "command='$command';"
+            done` >/dev/null 2>&1
+    if [ $? -ne 0 ]
+    then
+        echo "load $type command fail, target:[$target]" >&2
+        continue
+    fi 
+    if [ -n "$debug" ]
+    then
+        echo "target:[$target], type:[$type], command:[$command]"
+    fi
+    if [   -z "$type" -o -z "$command" ]
+    then
+        echo "$type command not found, target:[$target]" >&2
+        continue
+    fi
+
+    # find target's module
+    module=`grep -v -E "^#|^$" $mkxrc_targets 2>/dev/null \
+            | grep -w "$target" \
+            | tail -n1 \
+            | awk '{print $1}'`
+    if [ -z "$module" ]
+    then
+        echo "module not found, target:[$target]" >&2
+        exit 1
+    fi 
+
+    # load module's info
+    eval `grep -v -E "^#|^$" $mkxrc_modules 2>/dev/null \
+          | grep -w "^$module" 2>/dev/null \
+          | tail -n1 \
+          | awk '{printf "username=%s; rsapkey=%s; hostname=%s; hostport=%s;" \
+                         ,         $2,         $3,          $4,          $5}'`
+    if [ -n "$debug" ]
+    then
+        echo "target:[$target], module:[$module]," \
+             "username:[$username], rsa-private:[$rsapkey]," \
+             "hostname:[$hostname], hostport:[$hostport]"
+     fi
+     if [   -z "$username" -o -z "$rsapkey" \
+         -o -z "$hostname" -o -z "$hostport" ]
+     then
+         echo "module not found, target:[$target], module:[$module]" >&2
+         continue
+     fi
+
+    # run command
+    echo "run $type command for '$target' with command:[$command]"
+    ssh -i $rsapkey -p $hostport $username@$hostname "$command"
+done
