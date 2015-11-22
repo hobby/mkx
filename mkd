@@ -22,12 +22,40 @@
 #     2015/11/21: 支持命令行或者makefile中OUTPUT定义的target
 #                 支持-f选项指定自定义makefile
 #                 支持-C选项指定自定义make目录
+#     2015/11/22: 支持绝对/相对目录递归mkd
 #
 ############################################################
 
 # target(*) <-----> module(1) <-----> deploy destination(1)
 mkxrc_targets=~/.mkxrc_targets
 mkxrc_modules=~/.mkxrc_modules
+
+# get make directory
+makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
+if [ -z "$makedir" ]
+then
+    mklog error "make directory not found, make args:[$*]"
+    exit 1
+fi
+mklog debug "makedir=$makedir"
+
+# maybe mkd for sub directorys
+submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+mklog debug "submakedirs=$submakedirs"
+if [ -n "$submakedirs" ]
+then
+    for subdir in $submakedirs
+    do
+        if [ "${subdir:0:1}" = "/" ]
+        then
+            mkd -C $subdir
+        else
+            mkd -C $makedir/$subdir
+        fi
+    done
+    mklog debug "mkd for directorys end"
+    exit 0
+fi
 
 # get targets from cmdline
 targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
@@ -41,14 +69,7 @@ then
     mklog error "targets not found, make args:[$*]"
     exit 1
 fi
-
-# get make directory
-makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | cut -c11-`"
-if [ -z "$makedir" ]
-then
-    mklog error "make directory not found, make args:[$*]"
-    exit 1
-fi
+mklog debug "targets=$targets"
 
 # make targets
 make $* $targets
@@ -91,13 +112,10 @@ do
           | tail -n1 \
           | awk '{printf "username=%s; rsapkey=%s; hostname=%s; hostport=%s; hostpath=%s" \
                         ,         $2,         $3,          $4,          $5,          $6}'`
-    if [ -n "$debug" ]
-    then
-        mklog debug "target:[$target], module:[$module]," \
-                    "username:[$username], rsa-private:[$rsapkey]," \
-                    "hostname:[$hostname], hostport:[$hostport]," \
-                    "hostpath:[$hostpath], makedir:[$makedir]"
-    fi
+    mklog debug "target:[$target], module:[$module]," \
+                "username:[$username], rsa-private:[$rsapkey]," \
+                "hostname:[$hostname], hostport:[$hostport]," \
+                "hostpath:[$hostpath], makedir:[$makedir]"
     if [   -z "$username" -o -z "$rsapkey" \
         -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
     then

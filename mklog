@@ -42,5 +42,5 @@ then
     echo "`greentext $*`"
 elif [ "$type" = "debug" ]
 then
-    echo "`yellowtext $*`"
+    if [ -n "$debug" ] ; then echo "`yellowtext $*`" ; fi
 fi
