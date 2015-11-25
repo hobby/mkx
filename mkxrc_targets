@@ -1,5 +1,5 @@
-# vim:ft=conf
+# vim:ts=4:sw=4:ft=conf:expandtab
 
-# module target ...
-mkx target1 target2
-mkx targeta targetb
+# module path target ...
+mkx /tmp/mkx/ target1 target2
+mkx /tmp/mkx/ targeta targetb

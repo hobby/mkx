@@ -1,4 +1,4 @@
-# vim:ft=conf
+# vim:ts=4:sw=4:ft=conf:expandtab
 
-# module username rsa-private hostname port path
-mkx mkx /home/mkx/.ssh/id_rsa.mkx dev 22 /tmp/mkx/
+# module username rsa-private hostname port
+mkx mkx /home/mkx/.ssh/id_rsa.mkx dev 22

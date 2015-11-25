@@ -1,6 +1,8 @@
-# vim:ft=conf
+# vim:ts=4:sw=4:ft=conf:expandtab
 
 # target start   start-command without single-queto
 # target stop    stop-command without single-queto
 # target restart restart-command without single-queto
+# target pre-deploy  @stop
+# target post-deploy @restart
 
