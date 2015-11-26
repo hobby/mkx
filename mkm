@@ -1,0 +1,81 @@
+#!/bin/bash
+# vim:ts=4:sw=4:expandtab
+
+############################################################
+# NAME
+#     mkm - a toy for manager mkx
+#
+# SYNOPSIS
+#     mkm
+#     mkm list target
+#     mkm del  target targets...
+#     mkm add  target module-name host-path targets...
+# 
+#     debug=on mkm ...
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     mkxrc_commands
+#     mkxrc_targets
+#     mkxrc_modules
+#
+# VERSION
+#     2015/11/26: 支持查看/删除/新增target
+#
+############################################################
+
+# target(*) <-----> module(1)     <-----> destination(1)
+# target(1) <-----> command(stop)
+mkxrc_targets=~/.mkxrc_targets
+
+function showhelp()
+{
+    echo "usage:"
+    echo "    mkm list target"
+    echo "    mkm del  target targets..."
+    echo "    mkm add  target module-name host-path targets..."
+}
+
+if [ $# -lt 2 ] ; then
+    showhelp && exit 1;
+fi
+
+cmd="$1"
+mod="$2"
+
+if [ "$cmd" != "add" -a "$cmd" != "list" -a "$cmd" != "del" ] ; then
+    showhelp && exit 1;
+fi
+if [ "$mod" != "target" ] ; then
+    showhelp && exit 1;
+fi
+
+shift 2
+if [ $mod = "target" ] ; then
+    if [ $cmd = "add" ] ; then
+        echo "$*" >> $mkxrc_targets
+        if [ $? -eq 0 ] ; then
+            mklog normal "add target succ"
+        else
+            mklog error "add target fail"
+        fi
+    elif [ $cmd = "list" ] ; then
+        if [ -s $mkxrc_targets ] ; then
+            cat $mkxrc_targets
+        else
+            mklog error "$mkxrc_targets not found"
+        fi
+    elif [ $cmd = "del" ] ; then
+        if [ -s $mkxrc_targets ] ; then
+            for target in $* ; do
+                sed -i "s/\<$target\>//g" $mkxrc_targets
+                mklog normal "del target($target) succ"
+            done
+        else
+            mklog error "$mkxrc_targets not found"
+        fi
+    fi
+fi
+

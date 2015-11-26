@@ -28,6 +28,7 @@
 #                 支持可配置登录方式(目前只支持rsa)
 #                 支持自定义make前/后执行命令(pre/post-make)
 #                 支持deploy前/后执行命令(pre/post-deploy)
+#     2015/11/26: 支持忽略未配置target
 #
 ############################################################
 
@@ -118,6 +119,7 @@ do
     fi
 
     # find target's module
+    module=""; hostpath="";
     eval `grep -v -E "^#|^$" $mkxrc_targets 2>/dev/null \
           | grep -w "$target" \
           | tail -n1 \
@@ -125,10 +127,11 @@ do
                          ,       $1,          $2}'`
     if [ -z "$module" ] ; then
         mklog error "module not found, target:[$target]"
-        exit 1
+        continue
     fi 
 
     # load module's info
+    mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
     eval `grep -v -E "^#|^$" $mkxrc_modules 2>/dev/null \
           | grep -w "^$module" 2>/dev/null \
           | tail -n1 \
