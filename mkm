@@ -6,10 +6,13 @@
 #     mkm - a toy for manager mkx
 #
 # SYNOPSIS
-#     mkm
 #     mkm list target
 #     mkm del  target targets...
 #     mkm add  target module-name host-path targets...
+#
+#     mkm list module
+#     mkm del  module modules...
+#     mkm add  module module-name rsa username rsapkey-path hostname hostport
 # 
 #     debug=on mkm ...
 #
@@ -23,12 +26,14 @@
 #
 # VERSION
 #     2015/11/26: 支持查看/删除/新增target
+#     2015/11/27: 支持查看/删除/新增module
 #
 ############################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
 # target(1) <-----> command(stop)
 mkxrc_targets=~/.mkxrc_targets
+mkxrc_modules=~/.mkxrc_modules
 
 function showhelp()
 {
@@ -36,6 +41,10 @@ function showhelp()
     echo "    mkm list target"
     echo "    mkm del  target targets..."
     echo "    mkm add  target module-name host-path targets..."
+    echo ""
+    echo "    mkm list module"
+    echo "    mkm del  module modules..."
+    echo "    mkm add  module module-name rsa username rsapkey-path hostname hostport"
 }
 
 if [ $# -lt 2 ] ; then
@@ -48,11 +57,12 @@ mod="$2"
 if [ "$cmd" != "add" -a "$cmd" != "list" -a "$cmd" != "del" ] ; then
     showhelp && exit 1;
 fi
-if [ "$mod" != "target" ] ; then
+if [ "$mod" != "target" -a "$mod" != "module" ] ; then
     showhelp && exit 1;
 fi
 
 shift 2
+
 if [ $mod = "target" ] ; then
     if [ $cmd = "add" ] ; then
         echo "$*" >> $mkxrc_targets
@@ -79,3 +89,31 @@ if [ $mod = "target" ] ; then
     fi
 fi
 
+if [ $mod = "module" ] ; then
+    if [ $cmd = "add" ] ; then
+        if [ $# -lt 6 ] ; then
+            showhelp && exit 1;
+        fi
+        echo "$*" >> $mkxrc_modules
+        if [ $? -eq 0 ] ; then
+            mklog normal "add module succ"
+        else
+            mklog error "add module fail"
+        fi
+    elif [ $cmd = "list" ] ; then
+        if [ -s $mkxrc_modules ] ; then
+            cat $mkxrc_modules
+        else
+            mklog error "$mkxrc_modules not found"
+        fi
+    elif [ $cmd = "del" ] ; then
+        if [ -s $mkxrc_modules ] ; then
+            for module in $* ; do
+                sed -i "/^$module[ \t]/d" $mkxrc_modules
+                mklog normal "del module($module) succ"
+            done
+        else
+            mklog error "$mkxrc_modules not found"
+        fi
+    fi
+fi
