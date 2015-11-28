@@ -29,12 +29,12 @@
 #                 支持自定义make前/后执行命令(pre/post-make)
 #                 支持deploy前/后执行命令(pre/post-deploy)
 #     2015/11/26: 支持忽略未配置target
+#     2015/11/28: 支持使用mkm查找target(project/global/system级别)
 #
 ############################################################
 
 # target(*) <-----> module(1) <-----> deploy destination(1)
 mkxrc_configs=~/.mkxrc_configs
-mkxrc_targets=~/.mkxrc_targets
 mkxrc_modules=~/.mkxrc_modules
 
 # get make directory
@@ -120,9 +120,7 @@ do
 
     # find target's module
     module=""; hostpath="";
-    eval `grep -v -E "^#|^$" $mkxrc_targets 2>/dev/null \
-          | grep -w "$target" \
-          | tail -n1 \
+    eval `mkm find target $target \
           | awk '{printf "module=%s; hostpath=%s;" \
                          ,       $1,          $2}'`
     if [ -z "$module" ] ; then

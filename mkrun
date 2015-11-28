@@ -24,13 +24,13 @@
 #     2015/11/25: 支持可配置登录方式(目前只支持rsa)
 #                 支持pre-deploy/post-deploy类型命令
 #                 支持命令别名(alias)
+#     2015/11/28: 支持使用mkm查找target(project/global/system级别)
 #
 ##################################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
 # target(1) <-----> command(stop)
 mkxrc_commands=~/.mkxrc_commands
-mkxrc_targets=~/.mkxrc_targets
 mkxrc_modules=~/.mkxrc_modules
 
 if [ $# -lt 2 ] ; then
@@ -54,6 +54,19 @@ shift 1
 # run target's command with type
 for target in $*
 do
+    # .so target is specail
+    if expr match "$target" ".*\.so$" >/dev/null 2>&1 ; then
+        if ! expr match "$target" "^lib" >/dev/null 2>&1 ; then
+            target="lib$target"
+        fi
+    fi
+    # .a target is specail
+    if expr match "$target" ".*\.a$" >/dev/null 2>&1 ; then
+        if ! expr match "$target" "^lib" >/dev/null 2>&1 ; then
+            target="lib$target"
+        fi
+    fi
+
     # find target's command
     command=
     eval `grep -v -E "^#|^$" $mkxrc_commands 2>/dev/null \
@@ -83,10 +96,7 @@ do
     fi
 
     # find target's module
-    module=`grep -v -E "^#|^$" $mkxrc_targets 2>/dev/null \
-            | grep -w "$target" \
-            | tail -n1 \
-            | awk '{print $1}'`
+    module=`mkm find target $target | awk '{print $1}'`
     if [ -z "$module" ] ; then
         mklog error "module not found, target:[$target]"
         exit 1

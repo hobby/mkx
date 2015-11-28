@@ -6,14 +6,16 @@
 #     mkm - a toy for manager mkx
 #
 # SYNOPSIS
-#     mkm list target
-#     mkm del  target targets...
-#     mkm add  target module-name host-path targets...
+#     mkm find target [ --global | --system ]
+#     mkm list target [ --global | --system ]
+#     mkm path target [ --global | --system ]
+#     mkm del  target [ --global | --system ] targets...
+#     mkm add  target [ --global | --system ] module-name host-path targets...
 #
 #     mkm list module
 #     mkm del  module modules...
 #     mkm add  module module-name rsa username rsapkey-path hostname hostport
-# 
+#
 #     debug=on mkm ...
 #
 # AUTHORS
@@ -27,20 +29,26 @@
 # VERSION
 #     2015/11/26: 支持查看/删除/新增target
 #     2015/11/27: 支持查看/删除/新增module
+#     2015/11/28: 支持project/global/system级别的target配置
 #
 ############################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
 # target(1) <-----> command(stop)
-mkxrc_targets=~/.mkxrc_targets
 mkxrc_modules=~/.mkxrc_modules
+
+mkxrc_targets_sys="/etc/mkxrc_targets"
+mkxrc_targets_glo="$HOME/.mkxrc_targets"
+mkxrc_targets_prj="`pwd -P`/.mkxrc_targets~"
 
 function showhelp()
 {
     echo "usage:"
-    echo "    mkm list target"
-    echo "    mkm del  target targets..."
-    echo "    mkm add  target module-name host-path targets..."
+    echo "    mkm find target [ --global | --system ]"
+    echo "    mkm list target [ --global | --system ]"
+    echo "    mkm path target [ --global | --system ]"
+    echo "    mkm del  target [ --global | --system ] targets..."
+    echo "    mkm add  target [ --global | --system ] module-name host-path targets..."
     echo ""
     echo "    mkm list module"
     echo "    mkm del  module modules..."
@@ -54,7 +62,12 @@ fi
 cmd="$1"
 mod="$2"
 
-if [ "$cmd" != "add" -a "$cmd" != "list" -a "$cmd" != "del" ] ; then
+if [   "$cmd" != "add"  \
+    -a "$cmd" != "list" \
+    -a "$cmd" != "find" \
+    -a "$cmd" != "del"  \
+    -a "$cmd" != "get"  \
+    -a "$cmd" != "path" ] ; then
     showhelp && exit 1;
 fi
 if [ "$mod" != "target" -a "$mod" != "module" ] ; then
@@ -64,33 +77,95 @@ fi
 shift 2
 
 if [ $mod = "target" ] ; then
-    if [ $cmd = "add" ] ; then
-        echo "$*" >> $mkxrc_targets
-        if [ $? -eq 0 ] ; then
-            mklog normal "add target succ"
-        else
-            mklog error "add target fail"
+    case "$cmd" in
+    find)
+        path="`mkm path target $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            grep -v -E "^#|^$" "$path" 2>/dev/null \
+            | grep -w "$2" \
+            | tail -n1
+            exit
         fi
-    elif [ $cmd = "list" ] ; then
-        if [ -s $mkxrc_targets ] ; then
-            cat $mkxrc_targets
-        else
-            mklog error "$mkxrc_targets not found"
+        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+              | grep -w "$1" \
+              | tail -n1`"
+        [ -z "$out" ] && out="`mkm find target --global $1`"
+        [ -z "$out" ] && out="`mkm find target --system $1`"
+        echo "$out"
+        exit
+        ;;
+    list)
+        path="`mkm path target $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            debug=on mklog debug "# ${1:2}'s targets ($path):"
+            [ -s "$path" ] && cat "$path"
+            exit
         fi
-    elif [ $cmd = "del" ] ; then
-        if [ -s $mkxrc_targets ] ; then
-            for target in $* ; do
-                sed -i "s/\<$target\>//g" $mkxrc_targets
-                mklog normal "del target($target) succ"
-            done
-        else
-            mklog error "$mkxrc_targets not found"
+        debug=on mklog debug "# project's targets ($path):"
+        [ -s "$path" ] && cat "$path"
+        mkm list target --global
+        mkm list target --system
+        exit
+        ;;
+    del)
+        path="`mkm path target $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            flag="$1"
+            shift 1
+            [ -f "$path" ] \
+            && for target in $* ; do
+                sed -i "s/\<$target\>//g" "$path"
+                mklog normal "del ${flag:2} target($target) succ"
+            done \
+            ||  mklog error "del ${flag:2} target($*) fail"
+            exit
         fi
-    fi
+        [ -f "$path" ] \
+        && for target in $* ; do
+            sed -i "s/\<$target\>//g" "$path"
+            mklog normal "del project target($target) succ"
+        done \
+        ||  mklog error "del project target($*) fail"
+        exit
+        ;;
+    add)
+        path="`mkm path target $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            flag="$1"
+            shift 1
+            echo "$*" >> "$path" \
+            && mklog normal "add ${flag:2} target succ" || mklog error "add ${flag:2} target fail"
+            exit
+        fi
+        echo "$*" >> "$path" \
+        && mklog normal "add project target succ" || mklog error "add project target fail"
+        exit
+        ;;
+    path)
+        [ "$1" = "--global" ] && echo "$mkxrc_targets_glo" && exit
+        [ "$1" = "--system" ] && echo "$mkxrc_targets_sys" && exit
+        if [ -f "$mkxrc_targets_prj" ] ; then
+            echo "$mkxrc_targets_prj"
+            exit
+        fi
+        mkxrc_targets_prj="`dirname $(dirname "$mkxrc_targets_prj")`/`basename "$mkxrc_targets_prj"`"
+        while [ "`dirname "$mkxrc_targets_prj"`" != "/" ] ; do
+            if [ -f "$mkxrc_targets_prj" ] ; then
+                echo "$mkxrc_targets_prj"
+                exit
+            fi
+            mkxrc_targets_prj="`dirname $(dirname "$mkxrc_targets_prj")`/`basename "$mkxrc_targets_prj"`"
+        done
+        mkxrc_targets_prj="`pwd -P`/`basename $mkxrc_targets_prj`"
+        echo "$mkxrc_targets_prj"
+        exit
+        ;;
+    esac
 fi
 
 if [ $mod = "module" ] ; then
-    if [ $cmd = "add" ] ; then
+    case "$cmd" in
+    add)
         if [ $# -lt 6 ] ; then
             showhelp && exit 1;
         fi
@@ -100,13 +175,15 @@ if [ $mod = "module" ] ; then
         else
             mklog error "add module fail"
         fi
-    elif [ $cmd = "list" ] ; then
+        ;;
+    list)
         if [ -s $mkxrc_modules ] ; then
             cat $mkxrc_modules
         else
             mklog error "$mkxrc_modules not found"
         fi
-    elif [ $cmd = "del" ] ; then
+        ;;
+    del)
         if [ -s $mkxrc_modules ] ; then
             for module in $* ; do
                 sed -i "/^$module[ \t]/d" $mkxrc_modules
@@ -115,5 +192,6 @@ if [ $mod = "module" ] ; then
         else
             mklog error "$mkxrc_modules not found"
         fi
-    fi
+        ;;
+    esac 
 fi
