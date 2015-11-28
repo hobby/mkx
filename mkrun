@@ -25,13 +25,13 @@
 #                 支持pre-deploy/post-deploy类型命令
 #                 支持命令别名(alias)
 #     2015/11/28: 支持使用mkm查找target(project/global/system级别)
+#                 支持使用mkm查找module(project/global/system级别)
+#                 支持使用mkm查找command(project/global/system级别)
 #
 ##################################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
 # target(1) <-----> command(stop)
-mkxrc_commands=~/.mkxrc_commands
-mkxrc_modules=~/.mkxrc_modules
 
 if [ $# -lt 2 ] ; then
     mklog error "usage: $0 start|stop|restart|pre-deploy|post-deploy targets ..."
@@ -69,13 +69,10 @@ do
 
     # find target's command
     command=
-    eval `grep -v -E "^#|^$" $mkxrc_commands 2>/dev/null \
-          | grep -P "^$target[ \t]*$type" \
-          | tail -n1 \
-          | while read target type command
-            do
-                echo "command='$command';"
-            done` >/dev/null 2>&1
+    eval `mkm find command $target $type | while read target type command
+          do
+              echo "command='$command';"
+          done` >/dev/null 2>&1
     if [ $? -ne 0 ] ; then
         mklog error "load $type command fail, target:[$target]"
         continue
@@ -99,13 +96,12 @@ do
     module=`mkm find target $target | awk '{print $1}'`
     if [ -z "$module" ] ; then
         mklog error "module not found, target:[$target]"
-        exit 1
+        continue
     fi 
 
     # load module's info
-    eval `grep -v -E "^#|^$" $mkxrc_modules 2>/dev/null \
-          | grep -w "^$module" 2>/dev/null \
-          | tail -n1 \
+    mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
+    eval `mkm find module $module \
           | awk '{printf "mtype=%s; username=%s; rsapkey=%s; hostname=%s; hostport=%s;" \
                          ,      $2,          $3,         $4,          $5,          $6}'`
     if [ -n "$debug" ] ; then

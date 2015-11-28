@@ -30,12 +30,12 @@
 #                 支持deploy前/后执行命令(pre/post-deploy)
 #     2015/11/26: 支持忽略未配置target
 #     2015/11/28: 支持使用mkm查找target(project/global/system级别)
+#                 支持使用mkm查找module(project/global/system级别)
+#                 支持使用mkm查找config(project/global/system级别)
 #
 ############################################################
 
 # target(*) <-----> module(1) <-----> deploy destination(1)
-mkxrc_configs=~/.mkxrc_configs
-mkxrc_modules=~/.mkxrc_modules
 
 # get make directory
 makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
@@ -74,15 +74,11 @@ fi
 mklog debug "targets=$targets"
 
 # pre make
-key=pre-make
-if [ -s "$mkxrc_configs" ] ; then
-    exp="^[ \t]*$key[ \t]*="
-    cmd="`grep -v -E "^#|^$" $mkxrc_configs | grep -P "$exp" | tail -n1 | sed "s/$exp//g"`"
-    mklog debug "pre-make:[$cmd]"
-    pwd="`pwd`"
-    cd "$makedir" && eval "$cmd"
-    cd "$pwd"
-fi
+cmd="`mkm get config pre-make`"
+mklog debug "pre-make:[$cmd]"
+pwd="`pwd`"
+cd "$makedir" && eval "$cmd"
+cd "$pwd"
 
 # make targets
 make $* $targets
@@ -92,15 +88,11 @@ if [ $? -ne 0 ] ; then
 fi
 
 # post make
-key=post-make
-if [ -s "$mkxrc_configs" ] ; then
-    exp="^[ \t]*$key[ \t]*="
-    cmd="`grep -v -E "^#|^$" $mkxrc_configs | grep -P "$exp" | tail -n1 | sed "s/$exp//g"`"
-    mklog debug "post-make:[$cmd]"
-    pwd="`pwd`"
-    cd "$makedir" && eval "$cmd"
-    cd "$pwd"
-fi
+cmd="`mkm get config post-make`"
+mklog debug "pre-make:[$cmd]"
+pwd="`pwd`"
+cd "$makedir" && eval "$cmd"
+cd "$pwd"
 
 # deploy targets
 for target in $targets
@@ -128,11 +120,9 @@ do
         continue
     fi 
 
-    # load module's info
+    # find module's info
     mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
-    eval `grep -v -E "^#|^$" $mkxrc_modules 2>/dev/null \
-          | grep -w "^$module" 2>/dev/null \
-          | tail -n1 \
+    eval `mkm find module $module \
           | awk '{printf "mtype=%s; username=%s; rsapkey=%s; hostname=%s; hostport=%s;" \
                          ,     $2,          $3,         $4,          $5,          $6}'`
     mklog debug "target:[$target], module:[$module], mtype:[$mtype]," \
