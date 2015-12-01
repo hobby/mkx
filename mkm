@@ -51,8 +51,10 @@
 #
 ############################################################
 
+# Entity Relationship:
 # target(*) <-----> module(1)     <-----> destination(1)
-# target(1) <-----> command(stop)
+# target(1) <-----> command(*)
+
 mkxrc_targets_sys="/etc/mkxrc_targets"
 mkxrc_targets_glo="$HOME/.mkxrc_targets"
 mkxrc_targets_prj="`pwd -P`/.mkxrc_targets~"
@@ -363,16 +365,16 @@ if [ $mod = "config" ] ; then
         exit
         ;;
     list)
-        path="`mkm path command $1`"
+        path="`mkm path config $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
-            debug=on mklog debug "# ${1:2}'s commands ($path):"
+            debug=on mklog debug "# ${1:2}'s configs ($path):"
             [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
             exit
         fi
-        debug=on mklog debug "# project's commands ($path):"
+        debug=on mklog debug "# project's configs ($path):"
         [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
-        mkm list command --global
-        mkm list command --system
+        mkm list config --global
+        mkm list config --system
         exit
         ;;
     del)

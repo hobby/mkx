@@ -89,7 +89,7 @@ fi
 
 # post make
 cmd="`mkm get config post-make`"
-mklog debug "pre-make:[$cmd]"
+mklog debug "post-make:[$cmd]"
 pwd="`pwd`"
 cd "$makedir" && eval "$cmd"
 cd "$pwd"
