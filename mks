@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mks
-#     mks [ -f makefile ] [ -C directory ] [ targets ] ...
+#     mks [ -f makefile ] [ targets ] ...
 # 
 #     debug=on mks ...
 #
@@ -22,6 +22,7 @@
 # VERSION
 #     2015/11/21: 简单封装mkrun，支持启动
 #                 命令行或者makefile中OUTPUT定义的target
+#     2015/12/03: 支持目录递归查找target
 #
 ############################################################
 
@@ -30,6 +31,38 @@ if ! which mkrun >/dev/null 2>&1
 then
     mklog error "mkrun not found"
     exit 1
+fi
+
+# get make directory
+makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
+if [ -z "$makedir" ] ; then
+    mklog error "make directory not found, make args:[$*]"
+    exit 1
+fi
+mklog debug "makedir=$makedir"
+
+# maybe mks for sub directorys
+submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+mklog debug "submakedirs=$submakedirs"
+if [ -n "$submakedirs" ] ; then
+    for subdir in $submakedirs
+    do
+        mksdir=""
+        if [ "${subdir:0:1}" = "/" ] ; then
+            mksdir="$subdir"
+        else
+            mksdir="$makedir/$subdir"
+        fi
+
+        pwd="`pwd`"
+        echo "mks: Entering directory '$mksdir'"
+        cd "$mksdir"
+        mks
+        echo "mks: Leaving directory '$mksdir'"
+        cd "$pwd"
+    done
+    mklog debug "mks for directorys end"
+    exit 0
 fi
 
 # get targets from cmdline
@@ -44,6 +77,7 @@ then
     mklog error "targets not found, make args:[$*]"
     exit 1
 fi
+mklog debug "targets:[$targets]"
 
 # run target's start command
 mkrun start $targets

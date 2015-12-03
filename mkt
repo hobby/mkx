@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mkt
-#     mkt [ -f makefile ] [ -C directory ] [ targets ] ...
+#     mkt [ -f makefile ] [ targets ] ...
 # 
 #     debug=on mkt ...
 #
@@ -22,6 +22,7 @@
 # VERSION
 #     2015/11/21: 简单封装mkrun，支持关闭
 #                 命令行或者makefile中OUTPUT定义的target
+#     2015/12/03: 支持目录递归查找target
 #
 ############################################################
 
@@ -30,6 +31,41 @@ if ! which mkrun >/dev/null 2>&1
 then
     mklog error "mkrun not found"
     exit 1
+fi
+
+# get make directory
+makedir="$directory"
+if [ -z "$makedir" ] ; then
+    makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
+    if [ -z "$makedir" ] ; then
+        mklog error "make directory not found, make args:[$*]"
+        exit 1
+    fi
+    mklog debug "makedir=$makedir"
+fi
+
+# maybe mkt for sub directorys
+submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+mklog debug "submakedirs=$submakedirs"
+if [ -n "$submakedirs" ] ; then
+    for subdir in $submakedirs
+    do
+        mktdir=""
+        if [ "${subdir:0:1}" = "/" ] ; then
+            mktdir="$subdir"
+        else
+            mktdir="$makedir/$subdir"
+        fi
+
+        pwd="`pwd`"
+        echo "mkt: Entering directory '$mktdir'"
+        cd "$mktdir"
+        mkt
+        echo "mkt: Leaving directory '$mktdir'"
+        cd "$pwd"
+    done
+    mklog debug "mkt for directorys end"
+    exit 0
 fi
 
 # get targets from cmdline
@@ -44,6 +80,7 @@ then
     mklog error "targets not found, make args:[$*]"
     exit 1
 fi
+mklog debug "targets:[$targets]"
 
 # run target's stop command
 mkrun stop $targets
