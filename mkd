@@ -32,6 +32,7 @@
 #     2015/11/28: 支持使用mkm查找target(project/global/system级别)
 #                 支持使用mkm查找module(project/global/system级别)
 #                 支持使用mkm查找config(project/global/system级别)
+#     2015/12/03: 支持本地部署模块(local module)
 #
 ############################################################
 
@@ -129,20 +130,32 @@ do
                 "username:[$username], rsa-private:[$rsapkey]," \
                 "hostname:[$hostname], hostport:[$hostport]," \
                 "hostpath:[$hostpath], makedir:[$makedir]"
-    if [   -z "$mtype" -o -z "$username" -o -z "$rsapkey" \
-        -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
-    then
-        mklog error "module not found, target:[$target], module:[$module]"
+    if [ "$mtype" != "rsa" -a "$mtype" != "local" ] ; then
+        mklog error "module type unsupported, type:[$mtype]," \
+                    "supported type:[rsa, local]"
         exit 1
     fi
 
     # do deploy
     mkrun pre-deploy $target
-    if [ "$mtype" = "rsa" ] ; then
-        scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
-    else
-        mklog error "found unsupported mtype, mtype:[$mtype]"
-        exit 1
-    fi
+    case "$mtype" in
+        rsa)
+            if [   -z "$username" -o -z "$rsapkey" \
+                -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
+            then
+                mklog error "rsa module not ok, target:[$target], module:[$module]"
+                exit 1
+            fi
+            scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
+            ;;
+        local)
+            cp -v "$makedir/$target" $hostpath
+            ;;
+        *)
+            mklog error "module type unsupported, type:[$mtype]," \
+                        "supported type:[rsa, local]"
+            exit 1
+            ;;
+    esac
     mkrun post-deploy $target
 done

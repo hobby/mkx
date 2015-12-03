@@ -27,6 +27,7 @@
 #     2015/11/28: 支持使用mkm查找target(project/global/system级别)
 #                 支持使用mkm查找module(project/global/system级别)
 #                 支持使用mkm查找command(project/global/system级别)
+#     2015/12/03: 支持本地部署模块(local module)
 #
 ##################################################################
 
@@ -109,16 +110,31 @@ do
                     "username:[$username], rsa-private:[$rsapkey]," \
                     "hostname:[$hostname], hostport:[$hostport]"
     fi
-    if [   -z "$mtype" -o -z "$username" -o -z "$rsapkey" \
-        -o -z "$hostname" -o -z "$hostport" ]
-    then
-        mklog error "module not found, target:[$target], module:[$module]"
-        continue
+    if [ "$mtype" != "rsa" -a "$mtype" != "local" ] ; then
+        mklog error "module type unsupported, type:[$mtype]," \
+                    "supported type:[rsa, local]"
+        exit 1
     fi
 
     # run command
     mklog normal "run $type command for '$target' with command:[$command]"
-    if [ "$mtype" = "rsa" ] ; then
-        ssh -i $rsapkey -p $hostport $username@$hostname "$command"
-    fi
+    case "$mtype" in
+        rsa)
+            if [   -z "$mtype" -o -z "$username" -o -z "$rsapkey" \
+                -o -z "$hostname" -o -z "$hostport" ]
+            then
+                mklog error "rsa module not ok, target:[$target], module:[$module]"
+                continue
+            fi
+            ssh -i $rsapkey -p $hostport $username@$hostname "$command"
+            ;;
+        local)
+            eval "$command"
+            ;;
+        *)
+            mklog error "module type unsupported, type:[$mtype]," \
+                        "supported type:[rsa, local]"
+            exit 1
+            ;;
+    esac
 done
