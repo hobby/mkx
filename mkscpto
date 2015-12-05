@@ -1,0 +1,56 @@
+#!/usr/bin/expect --
+# vim:ts=4:sw=4:expandtab
+
+#######################################################################
+# NAME
+#     mkscpto - a toy for copy file from local to remote (using scp)
+#
+# SYNOPSIS
+#     mkscpto filepath username password hostname hostport hostpath
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     scp
+#     expect --help
+#
+# VERSION
+#     2015/12/05: 支持使用scp拷贝本地文件到远程机器
+#
+#######################################################################
+
+set filepath "[lindex $argv 0]"
+set username "[lindex $argv 1]"
+set password "[lindex $argv 2]"
+set hostname "[lindex $argv 3]"
+set hostport "[lindex $argv 4]"
+set hostpath "[lindex $argv 5]"
+set timeout  -1
+
+send_user "scp '$filepath' to $username@$hostname#$hostport:$hostpath\n"
+
+spawn -noecho scp -C -P$hostport $filepath $username@$hostname:$hostpath
+expect {
+    # say 'yes' for the first connection
+    "(yes/no)?" {
+        send "yes\r"
+
+        # now ask for password
+        expect "password:"
+        send "$password\r"
+    }
+
+    # ask for password on non-first connection
+    "password:" {
+        send "$password\r"
+    }
+
+    # error occurred, then exit
+    "ssh" {
+        exit
+    }
+}
+
+# wait for transmission done
+expect eof

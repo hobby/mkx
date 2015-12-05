@@ -4,6 +4,7 @@ output = mk mkc \
          mkrun mks mkt mkr \
          mklog \
          mkm \
+         mkscpto mkssh \
 
 prefix = ${HOME}
 

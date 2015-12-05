@@ -1,0 +1,67 @@
+#!/usr/bin/expect --
+# vim:ts=4:sw=4:expandtab
+
+#######################################################################
+# NAME
+#     mkssh - a toy for ssh (with command)
+#
+# SYNOPSIS
+#     mkssh username password hostname hostport          # login shell
+#     mkssh username password hostname hostport command  # run command
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     ssh
+#     expect --help
+#
+# VERSION
+#     2015/12/05: 支持使用ssh命令远程机器、执行远程命令
+#
+#######################################################################
+
+set username "[lindex $argv 0]"
+set password "[lindex $argv 1]"
+set hostname "[lindex $argv 2]"
+set hostport "[lindex $argv 3]"
+set command  "[lindex $argv 4]"
+set timeout  -1
+
+if { $command == "" } {
+    # for login shell
+    send_user "ssh to $username@$hostname#$hostport\n"
+} else {
+    # for run command
+    send_user "run '$command' at $username@$hostname#$hostport\n"
+}
+
+spawn -noecho ssh -p$hostport $username@$hostname "$command"
+expect {
+    # say 'yes' for the first connection
+    "(yes/no)?" {
+        send "yes\r"
+
+        # now ask for password
+        expect "password:"
+        send "$password\r"
+    }
+
+    # ask for password on non-first connection
+    "password:" {
+        send "$password\r"
+    }
+
+    # error occurred, then exit
+    "ssh" {
+        exit
+    }
+}
+
+if { $command == "" } {
+    # go into login shell
+    interact
+} else {
+    # wait for command done
+    expect eof
+}

@@ -28,6 +28,7 @@
 #                 支持使用mkm查找module(project/global/system级别)
 #                 支持使用mkm查找command(project/global/system级别)
 #     2015/12/03: 支持本地部署模块(local module)
+#     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
 #
 ##################################################################
 
@@ -110,9 +111,9 @@ do
                     "username:[$username], rsa-private:[$rsapkey]," \
                     "hostname:[$hostname], hostport:[$hostport]"
     fi
-    if [ "$mtype" != "rsa" -a "$mtype" != "local" ] ; then
+    if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
-                    "supported type:[rsa, local]"
+                    "supported type:[rsa, local, passwd]"
         exit 1
     fi
 
@@ -120,7 +121,7 @@ do
     mklog normal "run $type command for '$target' with command:[$command]"
     case "$mtype" in
         rsa)
-            if [   -z "$mtype" -o -z "$username" -o -z "$rsapkey" \
+            if [   -z "$username" -o -z "$rsapkey"  \
                 -o -z "$hostname" -o -z "$hostport" ]
             then
                 mklog error "rsa module not ok, target:[$target], module:[$module]"
@@ -130,6 +131,15 @@ do
             ;;
         local)
             eval "$command"
+            ;;
+        passwd)
+            if [   -z "$username" -o -z "$rsapkey"  \
+                -o -z "$hostname" -o -z "$hostport" ]
+            then
+                mklog error "passwd module not ok, target:[$target], module:[$module]"
+                exit 1
+            fi
+            mkssh $username $rsapkey $hostname $hostport "$command"
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \

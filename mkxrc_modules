@@ -1,4 +1,10 @@
 # vim:ts=4:sw=4:ft=conf:expandtab
 
-# module username rsa-private hostname port
-mkx mkx /home/mkx/.ssh/id_rsa.mkx dev 22
+# local-module:
+# module-name local
+
+# rsa-module:
+# module-name rsa username rsa-private hostname port
+
+# passwd-module:
+# module-name passwd username rsa-private hostname port

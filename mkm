@@ -19,7 +19,8 @@
 #     mkm find module [ --global | --system ]
 #     mkm del  module [ --global | --system ] modules...
 #     mkm add  module [ --global | --system ] module-name local
-#     mkm add  module [ --global | --system ] module-name rsa username rsapkey-path hostname hostport
+#     mkm add  module [ --global | --system ] module-name rsa    username rsapkey-path hostname hostport
+#     mkm add  module [ --global | --system ] module-name passwd username password     hostname hostport
 #
 #     mkm path config [ --global | --system ]
 #     mkm list config [ --global | --system ]
@@ -89,7 +90,8 @@ function showhelp()
     echo "    mkm find module [ --global | --system ] module"
     echo "    mkm del  module [ --global | --system ] modules..."
     echo "    mkm add  module [ --global | --system ] module-name local"
-    echo "    mkm add  module [ --global | --system ] module-name rsa username rsapkey-path hostname hostport"
+    echo "    mkm add  module [ --global | --system ] module-name rsa    username rsapkey-path hostname hostport"
+    echo "    mkm add  module [ --global | --system ] module-name passwd username password     hostname hostport"
     echo
     echo "    mkm path config [ --global | --system ]"
     echo "    mkm list config [ --global | --system ]"
@@ -257,16 +259,18 @@ if [ $mod = "module" ] ; then
             flag="$1"
             shift 1
             [ $# -lt 2 ] && showhelp && exit 1
-            [ "$2" != "rsa" -a "$2" != "local" ] && showhelp && exit 1
+            [ "$2" != "rsa" -a "$2" != "local" -a "$2" != "passwd" ] && showhelp && exit 1
             [ "$2" = "rsa" -a $# -lt 6 ] && showhelp && exit 1
+            [ "$2" = "passwd" -a $# -lt 6 ] && showhelp && exit 1
             echo "$*" >> "$path" \
             && mklog normal "add ${flag:2}($path) module succ" \
             || mklog error "add ${flag:2}($path) module fail"
             exit
         fi
         [ $# -lt 2 ] && showhelp && exit 1
-        [ "$2" != "rsa" -a "$2" != "local" ] && showhelp && exit 1
+        [ "$2" != "rsa" -a "$2" != "local" -a "$2" != "passwd" ] && showhelp && exit 1
         [ "$2" = "rsa" -a $# -lt 6 ] && showhelp && exit 1
+        [ "$2" = "passwd" -a $# -lt 6 ] && showhelp && exit 1
         echo "$*" >> "$path" \
         && mklog normal "add project($path) module succ" \
         || mklog error "add project($path) module fail"
