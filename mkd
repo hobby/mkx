@@ -34,67 +34,106 @@
 #                 支持使用mkm查找config(project/global/system级别)
 #     2015/12/03: 支持本地部署模块(local module)
 #     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
+#     2015/12/06: 支持非make编译的target(例如配置文件)
 #
 ############################################################
 
 # target(*) <-----> module(1) <-----> deploy destination(1)
 
-# get make directory
-makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
-if [ -z "$makedir" ] ; then
-    mklog error "make directory not found, make args:[$*]"
+cmdline="$*"
+targets=""
+makedir="`pwd`"
+makefile=""
+temp=$(getopt -o "f:C:" --long "" -n "$0" -- "$@")
+if [ $? != 0 ] ; then
+    echo "Usage: $0 [ -f makefile ] [ -C directory ] [ targets ] ..." >&2
     exit 1
 fi
-mklog debug "makedir=$makedir"
+eval set -- "$temp"
+while true
+do
+    case "$1" in
+        -C) makedir="$2" ;  shift 2 ;;
+        -f) makefile="$2" ; shift 2 ;;
+        --) shift ; break ;;
+        *)  echo "parse options error!" >&2 ; exit 1 ;;
+    esac
+done
+mklog debug "makdir-cmdline:[$makedir], makefile-cmdline:[$makefile], args-remained:[$*]"
 
-# maybe mkd for sub directorys
-submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
-mklog debug "submakedirs=$submakedirs"
-if [ -n "$submakedirs" ] ; then
-    for subdir in $submakedirs
-    do
-        if [ "${subdir:0:1}" = "/" ] ; then
-            mkd -C $subdir
-        else
-            mkd -C $makedir/$subdir
-        fi
-    done
-    mklog debug "mkd for directorys end"
-    exit 0
+if [ -z "$makefile" -a -z "`ls $makedir/{GNUmakefile,makefile,Makefile} 2>/dev/null`" ] ; then
+    # makefile not found, maybe none-make target (from cmdline)
+    targets="$*"
+    if [ -z "$targets" ] ; then
+        # default targets is regular file in `makedir`
+        targets="`find "$makedir" -maxdepth 1 -type f -exec basename '{}' \; 2>/dev/null`"
+    fi
+    if [ -z "$targets" ] ; then
+        mklog error "none-make targets not found, cmdline:[$cmdline]"
+        exit 1
+    fi
+    mklog debug "targets(none make):[$targets]"
+else
+    # recover origin args for need-make target
+    eval set -- "$cmdline"
+
+    # get make directory
+    makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
+    if [ -z "$makedir" ] ; then
+        mklog error "make directory not found, make args:[$*]"
+        exit 1
+    fi
+    mklog debug "makedir:[$makedir]"
+
+    # maybe mkd for sub directorys
+    submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+    mklog debug "submakedirs=$submakedirs"
+    if [ -n "$submakedirs" ] ; then
+        for subdir in $submakedirs
+        do
+            if [ "${subdir:0:1}" = "/" ] ; then
+                mkd -C $subdir
+            else
+                mkd -C $makedir/$subdir
+            fi
+        done
+        mklog debug "mkd for directorys end"
+        exit 0
+    fi
+
+    # get rgets from cmdline
+    targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
+    if [ -z "$targets" ] ; then
+        # default targets from OUTPUT var in makefile
+        targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
+    fi
+    if [ -z "$targets" ] ; then
+        mklog error "need-make targets not found, make args:[$*]"
+        exit 1
+    fi
+    mklog debug "targets(need make):[$targets]"
+
+    # pre make
+    cmd="`mkm get config pre-make`"
+    mklog debug "pre-make:[$cmd]"
+    pwd="`pwd`"
+    cd "$makedir" && eval "$cmd"
+    cd "$pwd"
+
+    # make targets
+    make $* $targets
+    if [ $? -ne 0 ] ; then
+        mklog error "make fail, make args:[$* $targets]"
+        exit 1
+    fi
+
+    # post make
+    cmd="`mkm get config post-make`"
+    mklog debug "post-make:[$cmd]"
+    pwd="`pwd`"
+    cd "$makedir" && eval "$cmd"
+    cd "$pwd"
 fi
-
-# get targets from cmdline
-targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
-if [ -z "$targets" ] ; then
-    # default targets from OUTPUT var in makefile
-    targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
-fi
-if [ -z "$targets" ] ; then
-    mklog error "targets not found, make args:[$*]"
-    exit 1
-fi
-mklog debug "targets=$targets"
-
-# pre make
-cmd="`mkm get config pre-make`"
-mklog debug "pre-make:[$cmd]"
-pwd="`pwd`"
-cd "$makedir" && eval "$cmd"
-cd "$pwd"
-
-# make targets
-make $* $targets
-if [ $? -ne 0 ] ; then
-    mklog error "make fail, make args:[$* $targets]"
-    exit 1
-fi
-
-# post make
-cmd="`mkm get config post-make`"
-mklog debug "post-make:[$cmd]"
-pwd="`pwd`"
-cd "$makedir" && eval "$cmd"
-cd "$pwd"
 
 # deploy targets
 for target in $targets
@@ -133,7 +172,7 @@ do
                 "hostpath:[$hostpath], makedir:[$makedir]"
     if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
-                    "supported type:[rsa, local, passwd]"
+                    "supported type:[rsa, local, passwd], target:[$target]"
         exit 1
     fi
 
