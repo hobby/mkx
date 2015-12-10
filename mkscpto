@@ -17,6 +17,7 @@
 #
 # VERSION
 #     2015/12/05: 支持使用scp拷贝本地文件到远程机器
+#     2015/12/10: 支持rsa验证方式
 #
 #######################################################################
 
@@ -32,7 +33,7 @@ send_user "scp '$filepath' to $username@$hostname#$hostport:$hostpath\n"
 
 spawn -noecho scp -C -P$hostport $filepath $username@$hostname:$hostpath
 expect {
-    # say 'yes' for the first connection
+    # say 'yes' for the first connection (passwd)
     "(yes/no)?" {
         send "yes\r"
 
@@ -41,9 +42,14 @@ expect {
         send "$password\r"
     }
 
-    # ask for password on non-first connection
+    # ask for password on non-first connection (passwd)
     "password:" {
         send "$password\r"
+    }
+
+    # wait for transmission done (rsa)
+    eof {
+        exit
     }
 
     # error occurred, then exit
@@ -52,5 +58,5 @@ expect {
     }
 }
 
-# wait for transmission done
+# wait for transmission done (passwd)
 expect eof

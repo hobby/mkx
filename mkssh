@@ -18,6 +18,7 @@
 #
 # VERSION
 #     2015/12/05: 支持使用ssh命令远程机器、执行远程命令
+#     2015/12/10: 支持rsa验证方式
 #
 #######################################################################
 
@@ -38,7 +39,7 @@ if { $command == "" } {
 
 spawn -noecho ssh -p$hostport $username@$hostname "$command"
 expect {
-    # say 'yes' for the first connection
+    # say 'yes' for the first connection (passwd)
     "(yes/no)?" {
         send "yes\r"
 
@@ -47,9 +48,20 @@ expect {
         send "$password\r"
     }
 
-    # ask for password on non-first connection
+    # ask for password on non-first connection (passwd)
     "password:" {
         send "$password\r"
+    }
+
+    # for login shell (rsa), \\$ is special for rsa/passwd
+    -re "#|>|\\$" {
+        interact
+        exit
+    }
+
+    # for command done (rsa)
+    eof {
+        exit
     }
 
     # error occurred, then exit
@@ -59,9 +71,11 @@ expect {
 }
 
 if { $command == "" } {
-    # go into login shell
+    # for login shell (passwd)
     interact
+    exit
 } else {
-    # wait for command done
+    # for command done (passwd)
     expect eof
+    exit
 }
