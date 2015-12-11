@@ -31,7 +31,6 @@
 #
 #     mkm path command [ --global | --system ]
 #     mkm list command [ --global | --system ]
-#     mkm get  command [ --global | --system ] target type
 #     mkm find command [ --global | --system ] target [type]
 #     mkm del  command [ --global | --system ] target type
 #     mkm add  command [ --global | --system ] target type command
@@ -51,6 +50,7 @@
 #     2015/11/28: 支持project/global/system级别
 #                 target/module/config/command配置(多项目场景)
 #     2015/12/03: 支持本地部署模块(local module)
+#     2015/12/11: 支持get config自动去掉左右空白(SP/TAB)
 #
 ############################################################
 
@@ -102,7 +102,6 @@ function showhelp()
     echo
     echo "    mkm path command [ --global | --system ]"
     echo "    mkm list command [ --global | --system ]"
-    echo "    mkm get  command [ --global | --system ] target type"
     echo "    mkm find command [ --global | --system ] target [type]"
     echo "    mkm del  command [ --global | --system ] target type"
     echo "    mkm add  command [ --global | --system ] target type command"
@@ -333,13 +332,13 @@ if [ $mod = "config" ] ; then
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
             val="`mkm find config $*`"
-            [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$2[ \t]*=//g"
+            [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$2[ \t]*=[ \t]*//g"
             exit
         fi
         val="`mkm find config $*`"
         [ -z "$val" ] && val="`mkm find config --global $1`"
         [ -z "$val" ] && val="`mkm find config --system $1`"
-        [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$1[ \t]*=//g"
+        [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$1[ \t]*=[ \t]*//g"
         exit
         ;;
     find)
