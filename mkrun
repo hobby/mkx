@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mkrun
-#     mkrun start|stop|restart|pre-deploy|post-deploy targets ... 
+#     mkrun command-type targets ...
 # 
 #     debug=on mkrun ...
 #
@@ -29,28 +29,20 @@
 #                 支持使用mkm查找command(project/global/system级别)
 #     2015/12/03: 支持本地部署模块(local module)
 #     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
+#     2015/12/11: 支持自定义命令类型
 #
 ##################################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
-# target(1) <-----> command(stop)
+# target(1) <-----> command(*)
 
 if [ $# -lt 2 ] ; then
-    mklog error "usage: $0 start|stop|restart|pre-deploy|post-deploy targets ..."
+    mklog error "usage: $0 command-type targets ..."
     exit 1
 fi
 
+# get command-type
 type="$1"
-if [   "$type" != "start"       \
-    -a "$type" != "stop"        \
-    -a "$type" != "restart"     \
-    -a "$type" != "pre-deploy"  \
-    -a "$type" != "post-deploy" ]
-then
-    mklog error "unknow command type, type:[$type]," \
-                "supported type:[start, stop, restart, pre-deploy, post-deploy]"
-    exit 1
-fi
 shift 1
 
 # run target's command with type
