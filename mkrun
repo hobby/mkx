@@ -15,9 +15,10 @@
 #     neiku project <ku7d@qq.com> 
 #
 # SEE ALSO
-#     mkxrc_commands
-#     mkxrc_targets
 #     mkxrc_modules
+#     mkxrc_targets
+#     mkxrc_commands
+#     mkxrc_commandtpls
 #
 # VERSION
 #     2015/11/21: 支持每个target指定类型的命令(start/stop/restart)
@@ -30,6 +31,7 @@
 #     2015/12/03: 支持本地部署模块(local module)
 #     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
 #     2015/12/11: 支持自定义命令类型
+#     2015/12/12: 支持命令模板(可配置不同模块的不同命令模板)
 #
 ##################################################################
 
@@ -42,7 +44,7 @@ if [ $# -lt 2 ] ; then
 fi
 
 # get command-type
-type="$1"
+cmdtype="$1"
 shift 1
 
 # run target's command with type
@@ -61,37 +63,63 @@ do
         fi
     fi
 
-    # find target's command
-    command=
-    eval `mkm find command $target $type | while read target type command
+    # find target's module
+    module=""; hostpath="";
+    eval `mkm find target $target \
+          | awk '{printf "module=%s; hostpath=%s;" \
+                         ,       $1,          $2}'`
+    if [ -z "$module" ] ; then
+        mklog error "module not found, target:[$target]"
+        continue
+    fi
+    mklog debug "module:[$module], hostpath:[$hostpath], target:[$target]"
+
+    # load target's command
+    command=""
+    eval `mkm find command $target $cmdtype | while read target type command
           do
               echo "command='$command';"
           done` >/dev/null 2>&1
     if [ $? -ne 0 ] ; then
-        mklog error "load $type command fail, target:[$target]"
+        mklog error "load '$cmdtype' command fail, target:[$target]"
         continue
     fi 
-    if [ -n "$debug" ] ; then
-        mklog debug "target:[$target], type:[$type], command:[$command]"
-    fi
-    if [   -z "$type" -o -z "$command" ] ; then
-        mklog error "$type command not found, target:[$target]"
-        continue
+    mklog debug "target:[$target], cmdtype:[$cmdtype], command:[$command]"
+    if [ -z "$command" ] ; then
+        # no command yet, try to build default command with tpl
+        cmdtpl=""
+        eval `mkm find commandtpl $module $cmdtype | while read moduledump typedump commandtpl
+              do
+                  echo "cmdtpl='$commandtpl';"
+              done` >/dev/null 2>&1
+        mklog debug "module:[$module], target:[$target], cmdtype:[$cmdtype], cmdtpl:[$cmdtpl]"
+        if [ -z "$cmdtpl" ] ; then
+            mklog error "'$cmdtype' command and default '$cmdtype' command tpl not found," \
+                        "module:[$module], target:[$target], cmdtype:[$cmdtype]"
+            continue
+        fi
+        # $hostpath has '/', it is special-char in sed (s command)
+        # so, we use '=' for sed (s command)
+        command="`echo "$cmdtpl" | sed -e "s={module}=$module=g"     \
+                                       -e "s={target}=$target=g"     \
+                                       -e "s={cmdtype}=$cmdtype=g"   \
+                                       -e "s={hostpath}=$hostpath=g" \
+                                       2>/dev/null`"
+        if [ -z "$command" ] ; then
+            mklog error "build default '$cmdtype' command fail, module:[$module]," \
+                        "target:[$target], command tpl:[$cmdtpl]"
+            continue
+        fi
+        mklog debug "build default '$cmdtype' command succ, module:[$module], target:[$target]," \
+                    "command:[$command], command tpl:[$cmdtpl]"
     fi
 
     # maybe command alias
     if [ "${command:0:1}" = "@" ] ; then
-        mklog debug "$target's $type command is alias ${command:1}"
+        mklog debug "$target's '$cmdtype' command is alias '${command:1}' command"
         mkrun "${command:1}" $target
         continue
     fi
-
-    # find target's module
-    module=`mkm find target $target | awk '{print $1}'`
-    if [ -z "$module" ] ; then
-        mklog error "module not found, target:[$target]"
-        continue
-    fi 
 
     # load module's info
     mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
@@ -106,11 +134,11 @@ do
     if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
                     "supported type:[rsa, local, passwd]"
-        exit 1
+        continue
     fi
 
     # run command
-    mklog normal "run $type command for '$target' with command:[$command]"
+    mklog normal "run '$cmdtype' command for '$target' with command:[$command]"
     case "$mtype" in
         rsa)
             if [   -z "$username" -o -z "$rsapkey"  \

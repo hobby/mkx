@@ -34,15 +34,23 @@
 #     mkm find command [ --global | --system ] target [type]
 #     mkm del  command [ --global | --system ] target type
 #     mkm add  command [ --global | --system ] target type command
+#
+#     mkm path commandtpl [ --global | --system ]
+#     mkm list commandtpl [ --global | --system ]
+#     mkm find commandtpl [ --global | --system ] module-name [type]
+#     mkm del  commandtpl [ --global | --system ] module-name type
+#     mkm add  commandtpl [ --global | --system ] module-name type command
+#
 #     debug=on mkm ...
 #
 # AUTHORS
 #     neiku project <ku7d@qq.com> 
 #
 # SEE ALSO
-#     mkxrc_commands
-#     mkxrc_targets
 #     mkxrc_modules
+#     mkxrc_targets
+#     mkxrc_commands
+#     mkxrc_commandtpls
 #
 # VERSION
 #     2015/11/26: 支持查看/删除/新增target
@@ -50,7 +58,9 @@
 #     2015/11/28: 支持project/global/system级别
 #                 target/module/config/command配置(多项目场景)
 #     2015/12/03: 支持本地部署模块(local module)
-#     2015/12/11: 支持get config自动去掉左右空白(SP/TAB)
+#     2015/12/11: 支持get config自动去掉左边空白(SP/TAB)
+#     2015/12/12: bugfix: get config去空白得在find之后马上执行
+#                 支持命令模板(可配置不同模块的不同命令模板)
 #
 ############################################################
 
@@ -73,6 +83,10 @@ mkxrc_configs_prj="`pwd -P`/.mkxrc_configs~"
 mkxrc_commands_sys="/etc/mkxrc_commands"
 mkxrc_commands_glo="$HOME/.mkxrc_commands"
 mkxrc_commands_prj="`pwd -P`/.mkxrc_commands~"
+
+mkxrc_commandtpls_sys="/etc/mkxrc_commandtpls"
+mkxrc_commandtpls_glo="$HOME/.mkxrc_commandtpls"
+mkxrc_commandtpls_prj="`pwd -P`/.mkxrc_commandtpls~"
 
 function showhelp()
 {
@@ -105,6 +119,12 @@ function showhelp()
     echo "    mkm find command [ --global | --system ] target [type]"
     echo "    mkm del  command [ --global | --system ] target type"
     echo "    mkm add  command [ --global | --system ] target type command"
+    echo
+    echo "    mkm path commandtpl [ --global | --system ]"
+    echo "    mkm list commandtpl [ --global | --system ]"
+    echo "    mkm find commandtpl [ --global | --system ] module-name [type]"
+    echo "    mkm del  commandtpl [ --global | --system ] module-name type"
+    echo "    mkm add  commandtpl [ --global | --system ] module-name type command"
 }
 
 if [ $# -lt 2 ] ; then
@@ -123,16 +143,16 @@ if [   "$cmd" != "init" \
     -a "$cmd" != "path" ] ; then
     showhelp && exit 1;
 fi
-if [   "$cmd" != "init"    \
-    -a "$mod" != "target"  \
-    -a "$mod" != "module"  \
-    -a "$mod" != "config"  \
-    -a "$mod" != "command" ] ; then
+if [   "$cmd" != "init"       \
+    -a "$mod" != "target"     \
+    -a "$mod" != "module"     \
+    -a "$mod" != "config"     \
+    -a "$mod" != "command"    \
+    -a "$mod" != "commandtpl" ] ; then
     showhelp && exit 1;
 fi
 if [   "$cmd"  = "get"     \
-    -a "$mod" != "config"  \
-    -a "$mod" != "command" ] ; then
+    -a "$mod" != "config"  ] ; then
     showhelp && exit 1;
 fi
 
@@ -144,6 +164,7 @@ if [ "$cmd" = "init" ] ; then
     touch "$mod/`basename $mkxrc_modules_prj`"
     touch "$mod/`basename $mkxrc_configs_prj`"
     touch "$mod/`basename $mkxrc_commands_prj`"
+    touch "$mod/`basename $mkxrc_commandtpls_prj`"
     echo "init project in $mod/ succ"
 fi
 
@@ -331,14 +352,14 @@ if [ $mod = "config" ] ; then
         [ -z "$1" ] && showhelp && exit 1
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            val="`mkm find config $*`"
-            [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$2[ \t]*=[ \t]*//g"
+            val="`mkm find config $* | sed "s/^[ \t]*$2[ \t]*=[ \t]*//g"`"
+            [ -n "$val" ] && echo "$val"
             exit
         fi
-        val="`mkm find config $*`"
+        val="`mkm find config $* | sed "s/^[ \t]*$1[ \t]*=[ \t]*//g"`"
         [ -z "$val" ] && val="`mkm find config --global $1`"
         [ -z "$val" ] && val="`mkm find config --system $1`"
-        [ -n "$val" ] && echo "$val" | sed "s/^[ \t]*$1[ \t]*=[ \t]*//g"
+        [ -n "$val" ] && echo "$val"
         exit
         ;;
     find)
@@ -510,6 +531,97 @@ if [ $mod = "command" ] ; then
         done
         mkxrc_commands_prj="`pwd -P`/`basename $mkxrc_commands_prj`"
         echo "$mkxrc_commands_prj"
+        exit
+        ;;
+    esac
+fi
+
+if [ $mod = "commandtpl" ] ; then
+    case "$cmd" in
+    find)
+        # [ --global | --system ] target [type]
+        [ -z "$1" ] && showhelp && exit 1
+        path="`mkm path commandtpl $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            [ -z "$2" ] && showhelp && exit 1
+            out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+                  | grep -w -P "^$2[ \t]*"`"
+            [ -z "$out" ] && exit
+            [ -z "$3" ] && echo "$out" && exit
+            echo "$out" | grep -P "^$2[ \t]*$3" | tail -n1 && exit
+        fi
+        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+              | grep -w -P "^$1[ \t]*"`"
+        [ -n "$out" -a -z "$2" ] \
+        && mkm find commandtpl --system $1 \
+        && mkm find commandtpl --global $1 \
+        && echo "$out" \
+        && exit
+        [ -n "$out" -a -n "$2" ] \
+        && out="`echo "$out" | grep -P "^$1[ \t]*$2" | tail -n1`"
+        [ -z "$out" ] && out="`mkm find commandtpl --global $1 $2`"
+        [ -z "$out" ] && out="`mkm find commandtpl --system $1 $2`"
+        [ -n "$out" ] && echo "$out"
+        exit
+        ;;
+    add)
+        path="`mkm path commandtpl $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            flag="$1"
+            shift 1
+            echo "$*" >> "$path" \
+            && mklog normal "add ${flag:2}($path) commandtpl succ" \
+            || mklog error "add ${flag:2}($path) commandtpl fail"
+            exit
+        fi
+        echo "$*" >> "$path" \
+        && mklog normal "add project($path) commandtpl succ" \
+        || mklog error "add project($path) commandtpl fail"
+        exit
+        ;;
+    list)
+        path="`mkm path commandtpl $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            debug=on mklog debug "# ${1:2}'s commandtpl ($path):"
+            [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
+            exit
+        fi
+        debug=on mklog debug "# project's commandtpl ($path):"
+        [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
+        mkm list commandtpl --global
+        mkm list commandtpl --system
+        exit
+        ;;
+    del)
+        path="`mkm path commandtpl $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            flag="$1"
+            shift 1
+            [ $# -lt 2 ] && showhelp && exit 1
+            [ -f "$path" ] \
+            && sed -i "/^[ \t]*$1[ \t]$2/d" "$path" \
+            && mklog normal "del ${flag:2} commandtpl($1 $2) succ" \
+            || mklog error "del ${flag:2} commandtpl($1 $2) fail"
+            exit
+        fi
+        [ $# -lt 2 ] && showhelp && exit 1
+        [ -f "$path" ] \
+        && sed -i "/^[ \t]*$1[ \t]$2/d" "$path" \
+        && mklog normal "del project commandtpl($1 $2) succ" \
+        || mklog error "del project commandtpl($1 $2) fail"
+        exit
+        ;;
+    path)
+        [ "$1" = "--global" ] && echo "$mkxrc_commandtpls_glo" && exit
+        [ "$1" = "--system" ] && echo "$mkxrc_commandtpls_sys" && exit
+        [ -f "$mkxrc_commandtpls_prj" ] && echo "$mkxrc_commandtpls_prj" && exit
+        mkxrc_commandtpls_prj="`dirname $(dirname "$mkxrc_commandtpls_prj")`/`basename "$mkxrc_commandtpls_prj"`"
+        while [ "`dirname "$mkxrc_commandtpls_prj"`" != "/" ] ; do
+            [ -f "$mkxrc_commandtpls_prj" ] && echo "$mkxrc_commandtpls_prj" && exit
+            mkxrc_commandtpls_prj="`dirname $(dirname "$mkxrc_commandtpls_prj")`/`basename "$mkxrc_commandtpls_prj"`"
+        done
+        mkxrc_commandtpls_prj="`pwd -P`/`basename $mkxrc_commandtpls_prj`"
+        echo "$mkxrc_commandtpls_prj"
         exit
         ;;
     esac

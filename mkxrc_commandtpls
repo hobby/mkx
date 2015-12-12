@@ -1,0 +1,10 @@
+# vim:ts=4:sw=4:ft=conf:expandtab
+
+# command tpl with type:
+# module-name start      start-command-tpl   without single-queto
+# module-name stop       stop-command-tpl    without single-queto
+# module-name restart    restart-command-tpl without single-queto
+
+# command tpl alias:
+# module-name pre-deploy  @stop
+# module-name post-deploy @restart

@@ -7,4 +7,4 @@
 # module-name rsa username rsa-private hostname port
 
 # passwd-module:
-# module-name passwd username rsa-private hostname port
+# module-name passwd username password hostname port
