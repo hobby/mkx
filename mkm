@@ -653,7 +653,7 @@ if [ $mod = "targetreg" ] ; then
             grep -v -E "^#|^$" "$path" 2>/dev/null \
             | tac \
             | while read module hostpath regexp ; do
-                if echo "$1" | grep -P "$regexp" >/dev/null 2>&1; then
+                if echo "$2" | grep -P "$regexp" >/dev/null 2>&1; then
                     echo "$module $hostpath $regexp"
                     break
                 fi
