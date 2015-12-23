@@ -36,6 +36,7 @@
 #     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
 #     2015/12/06: 支持非make编译的target(例如配置文件)
 #     2015/12/11: 支持使用mk工具编译target
+#     2015/12/23: 支持模式匹配target
 #
 ############################################################
 
@@ -116,6 +117,9 @@ else
 
     # make targets
     mk $*
+    if [ $? -ne 0 ] ; then
+        exit 1
+    fi
 fi
 
 # deploy targets
@@ -140,8 +144,14 @@ do
           | awk '{printf "module=%s; hostpath=%s;" \
                          ,       $1,          $2}'`
     if [ -z "$module" ] ; then
-        mklog error "module not found, target:[$target]"
-        continue
+        eval `mkm find targetreg $target \
+             | awk '{printf "module=%s; hostpath=%s;" \
+                            ,       $1,          $2}'`
+        if [ -z "$module" ] ; then
+            mklog error "module not found, target:[$target]"
+            continue
+        fi
+        mklog debug "module found in targetreg, target:[$target]"
     fi 
 
     # find module's info

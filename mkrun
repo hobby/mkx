@@ -32,6 +32,7 @@
 #     2015/12/05: 支持基于密码登录的远程部署模块(passwd module)
 #     2015/12/11: 支持自定义命令类型
 #     2015/12/12: 支持命令模板(可配置不同模块的不同命令模板)
+#     2015/12/23: 支持模式匹配target
 #
 ##################################################################
 
@@ -69,8 +70,14 @@ do
           | awk '{printf "module=%s; hostpath=%s;" \
                          ,       $1,          $2}'`
     if [ -z "$module" ] ; then
-        mklog error "module not found, target:[$target]"
-        continue
+        eval `mkm find targetreg $target \
+             | awk '{printf "module=%s; hostpath=%s;" \
+                            ,       $1,          $2}'`
+        if [ -z "$module" ] ; then
+            mklog error "module not found, target:[$target]"
+            continue
+        fi
+        mklog debug "module found in targetreg, target:[$target]"
     fi
     mklog debug "module:[$module], hostpath:[$hostpath], target:[$target]"
 

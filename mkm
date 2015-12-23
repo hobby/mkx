@@ -41,6 +41,11 @@
 #     mkm del  commandtpl [ --global | --system ] module-name type
 #     mkm add  commandtpl [ --global | --system ] module-name type command
 #
+#     mkm path targetreg [ --global | --system ]
+#     mkm list targetreg [ --global | --system ]
+#     mkm find targetreg [ --global | --system ] target
+#     mkm add  targetreg [ --global | --system ] module-name host-path regexp
+#
 #     debug=on mkm ...
 #
 # AUTHORS
@@ -61,6 +66,7 @@
 #     2015/12/11: 支持get config自动去掉左边空白(SP/TAB)
 #     2015/12/12: bugfix: get config去空白得在find之后马上执行
 #                 支持命令模板(可配置不同模块的不同命令模板)
+#     2015/12/16: 支持模式匹配target(TODO: 支持del targetreg)
 #
 ############################################################
 
@@ -87,6 +93,10 @@ mkxrc_commands_prj="`pwd -P`/.mkxrc_commands~"
 mkxrc_commandtpls_sys="/etc/mkxrc_commandtpls"
 mkxrc_commandtpls_glo="$HOME/.mkxrc_commandtpls"
 mkxrc_commandtpls_prj="`pwd -P`/.mkxrc_commandtpls~"
+
+mkxrc_targetregs_sys="/etc/mkxrc_targetregs"
+mkxrc_targetregs_glo="$HOME/.mkxrc_targetregs"
+mkxrc_targetregs_prj="`pwd -P`/.mkxrc_targetregs~"
 
 function showhelp()
 {
@@ -125,6 +135,11 @@ function showhelp()
     echo "    mkm find commandtpl [ --global | --system ] module-name [type]"
     echo "    mkm del  commandtpl [ --global | --system ] module-name type"
     echo "    mkm add  commandtpl [ --global | --system ] module-name type command"
+    echo
+    echo "    mkm path targetreg [ --global | --system ]"
+    echo "    mkm list targetreg [ --global | --system ]"
+    echo "    mkm find targetreg [ --global | --system ] target"
+    echo "    mkm add  targetreg [ --global | --system ] module-name host-path regexp"
 }
 
 if [ $# -lt 2 ] ; then
@@ -148,7 +163,8 @@ if [   "$cmd" != "init"       \
     -a "$mod" != "module"     \
     -a "$mod" != "config"     \
     -a "$mod" != "command"    \
-    -a "$mod" != "commandtpl" ] ; then
+    -a "$mod" != "commandtpl" \
+    -a "$mod" != "targetreg"  ] ; then
     showhelp && exit 1;
 fi
 if [   "$cmd"  = "get"     \
@@ -622,6 +638,84 @@ if [ $mod = "commandtpl" ] ; then
         done
         mkxrc_commandtpls_prj="`pwd -P`/`basename $mkxrc_commandtpls_prj`"
         echo "$mkxrc_commandtpls_prj"
+        exit
+        ;;
+    esac
+fi
+
+if [ $mod = "targetreg" ] ; then
+    case "$cmd" in
+    find)
+        [ -z "$1" ] && showhelp && exit 1
+        path="`mkm path targetreg $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            [ -z "$2" ] && showhelp && exit 1
+            grep -v -E "^#|^$" "$path" 2>/dev/null \
+            | tac \
+            | while read module hostpath regexp ; do
+                if echo "$1" | grep -P "$regexp" >/dev/null 2>&1; then
+                    echo "$module $hostpath $regexp"
+                    break
+                fi
+            done
+            exit
+        fi
+        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+            | tac \
+            | while read module hostpath regexp ; do
+                if echo "$1" | grep -P "$regexp" >/dev/null 2>&1; then
+                    echo "$module $hostpath $regexp"
+                    break
+                fi
+            done`"
+        [ -z "$out" ] && out="`mkm find targetreg --global $1`"
+        [ -z "$out" ] && out="`mkm find targetreg --system $1`"
+        [ -n "$out" ] && echo "$out"
+        exit
+        ;;
+    list)
+        path="`mkm path targetreg $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            debug=on mklog debug "# ${1:2}'s targetregs ($path):"
+            [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
+            exit
+        fi
+        debug=on mklog debug "# project's targetregs ($path):"
+        [ -s "$path" ] && cat "$path" | grep -v -E "^#|^$"
+        mkm list targetreg --global
+        mkm list targetreg --system
+        exit
+        ;;
+    del) # TODO: targetreg 本身是正则表达式
+        mklog error "'mkm del targetreg' command not supported now!"
+        exit
+        ;;
+    add)
+        path="`mkm path targetreg $1`"
+        if [ "$1" = "--global" -o "$1" = "--system" ] ; then
+            flag="$1"
+            shift 1
+            echo "$*" >> "$path" \
+            && mklog normal "add ${flag:2}($path) targetreg succ" \
+            || mklog error "add ${flag:2}($path) targetreg fail"
+            exit
+        fi
+        echo "$*" >> "$path" \
+        && mklog normal "add project($path) targetreg succ" \
+        || mklog error "add project($path) targetreg fail"
+        exit
+        ;;
+    path)
+        [ "$1" = "--global" ] && echo "$mkxrc_targetregs_glo" && exit
+        [ "$1" = "--system" ] && echo "$mkxrc_targetregs_sys" && exit
+        [ -f "$mkxrc_targetregs_prj" ] && echo "$mkxrc_targetregs_prj" && exit
+        mkxrc_targetregs_prj="`dirname $(dirname "$mkxrc_targetregs_prj")`/`basename "$mkxrc_targetregs_prj"`"
+        while [ "`dirname "$mkxrc_targetregs_prj"`" != "/" ] ; do
+            [ -f "$mkxrc_targetregs_prj" ] && echo "$mkxrc_targetregs_prj" && exit
+            mkxrc_targetregs_prj="`dirname $(dirname "$mkxrc_targetregs_prj")`/`basename "$mkxrc_targetregs_prj"`"
+        done
+        mkxrc_targetregs_prj="`pwd -P`/`basename $mkxrc_targetregs_prj`"
+        echo "$mkxrc_targetregs_prj"
         exit
         ;;
     esac
