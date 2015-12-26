@@ -37,6 +37,7 @@
 #     2015/12/06: 支持非make编译的target(例如配置文件)
 #     2015/12/11: 支持使用mk工具编译target
 #     2015/12/23: 支持模式匹配target
+#     2015/12/26: 支持忽略pre/post-deploy命令错误信息
 #
 ############################################################
 
@@ -170,7 +171,7 @@ do
     fi
 
     # do deploy
-    mkrun pre-deploy $target
+    mkrun pre-deploy $target 2>/dev/null
     case "$mtype" in
         rsa)
             if [   -z "$username" -o -z "$rsapkey" \
@@ -199,5 +200,5 @@ do
             exit 1
             ;;
     esac
-    mkrun post-deploy $target
+    mkrun post-deploy $target 2>/dev/null
 done
