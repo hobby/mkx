@@ -3,31 +3,103 @@
 
 ############################################################
 # NAME
-#     completion_mkx.sh - bash completion for mkx
+#     mkx_completion.sh - bash completion for mkx
 #
 # AUTHORS
 #     neiku project <ku7d@qq.com>
 #
 # VERSION
 #     2015/12/26: 支持自动补全mk/mkd(options/targets)
+#     2015/12/27: 支持自动补充mk/mkd/mkc(-f/-C选项)
 #
 ############################################################
 
 function _complete_callback_mk()
 {
+    local cur pre opt len word
+    local makefiles submakedirs targets
+    local makeflags opt_makefile opt_makedir
+
     COMPREPLY=()
 
-    local cur="${COMP_WORDS[COMP_CWORD]}"
-    local pre="${COMP_WORDS[COMP_CWORD-1]}"
-    local opt="-f <makefile> -C <directory>"
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    pre="${COMP_WORDS[COMP_CWORD-1]}"
+    opt="-f -C"
 
-    # options
+    # -f option-value
+    opt_makefile=""
+    len=${#COMP_WORDS[@]}
+    for ((i = 0; i < $len; i++)) ; do
+        word="${COMP_WORDS[$i]}"
+        if [[ "$word" == -f* ]] ; then
+            # -f<makefile> format, select the last one
+            if [[ "${word:2}" != "" ]] ; then
+                opt_makefile="${word:2}"
+                continue
+            fi
+            # -f <makefile> format, select the last one
+            if [[ $i < $len-1 ]] ; then
+                word="${COMP_WORDS[$((i+1))]}"
+                if [[ "$word" != "" ]] ; then
+                    opt_makefile="$word"
+                    continue
+                fi
+            fi
+        fi
+    done
+
+    # -C option-value
+    opt_makedir="."
+    len=${#COMP_WORDS[@]}
+    for ((i = 0; i < $len; i++)) ; do
+        word="${COMP_WORDS[$i]}"
+        if [[ "$word" == -C* ]] ; then
+            # -f<makedir> format, select the last one
+            if [[ "${word:2}" != "" && -d "${word:2}" ]] ; then
+                opt_makedir="${word:2}"
+                continue
+            fi
+            # -f <makedir> format, select the last one
+            if [[ $i < $len-1 ]] ; then
+                word="${COMP_WORDS[$((i+1))]}"
+                if [[ "$word" != "" && -d "$word" ]] ; then
+                    opt_makedir="$word"
+                    continue
+                fi
+            fi
+        fi
+    done
+
+    # make flags (-f/-C)
+    makeflags=""
+    if [[ "${opt_makedir}" != "" ]] ; then
+        makeflags="${makeflags} -C ${opt_makedir}"
+    fi
+    if [[ "${opt_makefile}" != "" ]] ; then
+        makeflags="${makeflags} -f ${opt_makefile}"
+    fi
+
+    # options-name
     if [[ "$pre" == "-f" ]] ; then
-        COMPREPLY=( $(compgen -W "`ls [Mm]akefile* GNUmakefile* 2>/dev/null`" -- "$cur") )
+        makefiles="`ls ${opt_makedir}/[Mm]akefile* ${opt_makedir}/GNUmakefile* 2>/dev/null \
+                    | while read file; do basename "$file"; done`"
+        if [[ "$makefiles" == "" ]] ; then
+            # makefile not found, just complete for file
+            makefiles="`ls 2>/dev/null`"
+        fi
+        COMPREPLY=( $(compgen -W "$makefiles" -- "$cur") )
         return 0
     fi
     if [[ "$pre" == "-C" ]] ; then
-        COMPREPLY=( $(compgen -W "`find . -maxdepth 1 -type d`" -- "$cur") )
+        submakedirs="`make ${makeflags} -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+        if [[ "$submakedirs" == "" ]] ; then
+            submakedirs="`find ${opt_makedir} -maxdepth 1 -type d 2>/dev/null`"
+        fi
+        if [[ "$submakedirs" == "" ]] ; then
+            COMPREPLY=( $(compgen -W "`ls`" -- "$cur") )
+        else
+            COMPREPLY=( $(compgen -W "$submakedirs" -- "$cur") )
+        fi
         return 0
     fi
     if [[ "$cur" == -* ]] ; then
@@ -36,14 +108,16 @@ function _complete_callback_mk()
     fi
 
     # targets
-    local submakedirs="`make -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+    submakedirs="`make ${makeflags} -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
     if [[ "$submakedirs" != "" ]] ; then
-        COMPREPLY=( $(ls) )
+        # redirect to -C
+        COMPREPLY=( "-C" )
         return 0
     fi
-    local targets="`make -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
+    targets="`make ${makeflags} -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
     if [[ "$targets" == "" ]] ; then
-        COMPREPLY=( $(ls) )
+        # target not fond, just compete for file
+        COMPREPLY=( $(compgen -W "`ls`" -- "$cur") )
         return 0
     fi
 
@@ -51,4 +125,5 @@ function _complete_callback_mk()
     return 0
 }
 complete -F _complete_callback_mk mk
+complete -F _complete_callback_mk mkc
 complete -F _complete_callback_mk mkd
