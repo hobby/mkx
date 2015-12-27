@@ -6,6 +6,8 @@ output = mk mkc \
          mkm \
          mkscpto mkssh \
 
+profile = mkx_completion.sh \
+
 prefix = ${HOME}
 
 link = no
@@ -37,6 +39,18 @@ install:
 		fi \
 	done
 	@echo -e "\e[32;1minstall ${output} ---> end\e[0m"
+	@if [[ `whoami` == "root" ]] ; then \
+		echo -e "\e[32;1minstall ${profile} to '/etc/profile.d/' with link=${link}\e[0m"; \
+		if [[ -d "/etc/profile.d/" ]] ; then \
+			for file in ${profile} ; do \
+				if [ "${link}" = "yes" ] ; then \
+					ln -svf `pwd`/$$file /etc/profile.d/; \
+				else \
+					cp -vf `pwd`/$$file /etc/profile.d; \
+				fi \
+			done \
+		fi \
+	fi\
 
 uninstall:
 	@echo -e "\e[32;1muninstall ${output} from '${prefix}'\e[0m"
@@ -44,3 +58,11 @@ uninstall:
 		\rm -vf ${prefix}/bin/$$file; \
 	done
 	@echo -e "\e[32;1muninstall ${output} ---> end\e[0m"
+	@if [[ `whoami` == "root" ]] ; then \
+		echo -e "\e[32;1muninstall ${profile} from '/etc/profile.d/'\e[0m"; \
+		if [[ -d "/etc/profile.d/" ]] ; then \
+			for file in ${profile} ; do \
+				\rm -vf /etc/profile.d/$$file; \
+			done \
+		fi \
+	fi\
