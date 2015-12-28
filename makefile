@@ -5,6 +5,7 @@ output = mk mkc \
          mklog \
          mkm \
          mkscpto mkssh \
+         mkx_completion.sh \
 
 profile = mkx_completion.sh \
 
@@ -38,31 +39,37 @@ install:
 			cp -vf `pwd`/$$file ${prefix}/bin/; \
 		fi \
 	done
-	@echo -e "\e[32;1minstall ${output} ---> end\e[0m"
-	@if [[ `whoami` == "root" ]] ; then \
-		echo -e "\e[32;1minstall ${profile} to '/etc/profile.d/' with link=${link}\e[0m"; \
+	if [[ `whoami` == "root" ]] ; then \
 		if [[ -d "/etc/profile.d/" ]] ; then \
 			for file in ${profile} ; do \
-				if [ "${link}" = "yes" ] ; then \
-					ln -svf `pwd`/$$file /etc/profile.d/; \
-				else \
-					cp -vf `pwd`/$$file /etc/profile.d; \
-				fi \
+				ln -svf ${prefix}/bin/$$file /etc/profile.d/; \
 			done \
 		fi \
-	fi\
+	else \
+		for file in ${profile} ; do \
+			if ! grep "${prefix}/bin/$$file" ~/.bashrc >/dev/null 2>&1; then \
+				echo "[ -f ${prefix}/bin/$$file ] && source ${prefix}/bin/$$file" >> ~/.bashrc; \
+			fi \
+		done \
+	fi
+	@echo -e "\e[32;1minstall ${output} ---> end\e[0m"
 
 uninstall:
 	@echo -e "\e[32;1muninstall ${output} from '${prefix}'\e[0m"
 	for file in ${output} ; do \
 		\rm -vf ${prefix}/bin/$$file; \
 	done
-	@echo -e "\e[32;1muninstall ${output} ---> end\e[0m"
-	@if [[ `whoami` == "root" ]] ; then \
-		echo -e "\e[32;1muninstall ${profile} from '/etc/profile.d/'\e[0m"; \
+	if [[ `whoami` == "root" ]] ; then \
 		if [[ -d "/etc/profile.d/" ]] ; then \
 			for file in ${profile} ; do \
 				\rm -vf /etc/profile.d/$$file; \
 			done \
 		fi \
-	fi\
+	else \
+		for file in ${profile} ; do \
+			if grep "${prefix}/bin/$$file" ~/.bashrc >/dev/null 2>&1; then \
+				sed -ir "/${profile}/d" ~/.bashrc; \
+			fi \
+		done \
+	fi
+	@echo -e "\e[32;1muninstall ${output} ---> end\e[0m"
