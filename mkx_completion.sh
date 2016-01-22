@@ -12,6 +12,7 @@
 #     2015/12/26: 支持自动补全mk/mkd(options/targets)
 #     2015/12/27: 支持自动补充mk/mkd/mkc(-f/-C选项)
 #     2016/01/10: 支持自动补充mkr/mkt/mks
+#     2016/01/22: 支持自动补充mkrun/mkm
 #
 ############################################################
 
@@ -232,7 +233,12 @@ function _complete_callback_mkr()
     targets="`make ${makeflags} -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
     if [[ "$targets" == "" ]] ; then
         # target not fond, try configed-targets
-        targets="`mkm list target 2>&1 | grep -v '#' | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' | tr ' ' '\n' | sed '/^$/d'`"
+        targets="`mkm list target 2>&1
+                 | grep -v '#'
+                 | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}'
+                 | tr ' ' '\n'
+                 | sed '/^$/d'
+                 | sort -u`"
         if [[ "$targets" == "" ]] ; then
             COMPREPLY=( $(compgen -W "`ls`" -- "$cur") )
             return 0
@@ -245,3 +251,151 @@ function _complete_callback_mkr()
 complete -F _complete_callback_mkr mkr
 complete -F _complete_callback_mkr mkt
 complete -F _complete_callback_mkr mks
+
+function _complete_callback_mkrun()
+{
+    local cur len word
+
+    COMPREPLY=()
+
+    len=${#COMP_WORDS[@]}
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    if [ $len -le 2 ] ; then
+        # mkrun <> or mkrun <cmdtype>
+        word="`mkm list command 2>&1 | grep -v '#' | awk '{print $2}' | sort -u`"
+    else
+        # mkrun cmdtype <target> ...
+        word="`mkm list command 2>&1 | grep -v '#' | awk '{print $1}' | sort -u`"
+    fi
+    COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+
+    return 0
+}
+complete -F _complete_callback_mkrun mkrun
+
+function _complete_callback_mkm()
+{
+    local cur len word
+    local cmd mod opt scope
+
+    COMPREPLY=()
+
+    len=${#COMP_WORDS[@]}
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    # mkm <> or mkm <cmd>
+    if [ $len -le 2 ] ; then
+        word="add del find get list path"
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+
+    # mkm cmd <mod> ...
+    if [ $len -le 3 ] ; then
+        cmd="${COMP_WORDS[1]}"
+        if [ "$cmd" = "del" ] ; then
+            word="command commandtpl config module target"
+        elif [ "$cmd" = "get" ] ; then
+            word="config"
+        else
+            word="command commandtpl config module target targetreg"
+        fi
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+
+    # mkm cmd mod <scope (--system|--global)> ...
+    opt="--system --global"
+    cmd="${COMP_WORDS[1]}"
+    mod="${COMP_WORDS[2]}"
+    if [ "$cmd" = "path" -o "$cmd" = "list" ] ; then
+        word="$opt"
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+    if [ "$cmd" = "find" ] ; then
+        if [ "$mod" = "target" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list target $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
+                  | tr ' ' '\n' \
+                  | sed '/^$/d' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        if [ "$mod" = "module" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list module $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{print $1}' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        if [ "$mod" = "config" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list config $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{print $1}' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        # TODO: find command commandtpl targetreg
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+    if [ "$cmd" = "del" ] ; then
+        if [ "$mod" = "target" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list target $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
+                  | tr ' ' '\n' \
+                  | sed '/^$/d' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        if [ "$mod" = "module" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list module $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{print $1}' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        if [ "$mod" = "config" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list config $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{print $1}' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        # TODO: del command commandtpl
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+    if [ "$cmd" = "get" ] ; then
+        if [ "$mod" = "config" ] ; then
+            scope="${COMP_WORDS[3]}"
+            word="`mkm list config $scope 2>&1 \
+                  | grep -v '#' \
+                  | awk '{print $1}' \
+                  | sort -u`"
+            word="$opt $word"
+        fi
+
+        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        return 0
+    fi
+    # TODO: add ...
+
+    return 0
+}
+complete -F _complete_callback_mkm mkm
