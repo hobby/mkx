@@ -10,10 +10,11 @@
 #
 # VERSION
 #     2015/12/26: 支持自动补全mk/mkd(options/targets)
-#     2015/12/27: 支持自动补充mk/mkd/mkc(-f/-C选项)
-#     2016/01/10: 支持自动补充mkr/mkt/mks
-#     2016/01/22: 支持自动补充mkrun/mkm
+#     2015/12/27: 支持自动补全mk/mkd/mkc(-f/-C选项)
+#     2016/01/10: 支持自动补全mkr/mkt/mks
+#     2016/01/22: 支持自动补全mkrun/mkm
 #     2016/01/23: 解决无法正常输出带有#的配置问题
+#                 完善mkm find所有子模块的自动补全
 #
 ############################################################
 
@@ -276,7 +277,7 @@ complete -F _complete_callback_mkrun mkrun
 function _complete_callback_mkm()
 {
     local cur len word
-    local cmd mod opt scope
+    local cmd mod opt scope target module
 
     COMPREPLY=()
 
@@ -316,32 +317,167 @@ function _complete_callback_mkm()
     if [ "$cmd" = "find" ] ; then
         if [ "$mod" = "target" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list target $scope 2>/dev/null \
-                  | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
-                  | tr ' ' '\n' \
-                  | sed '/^$/d' \
-                  | sort -u`"
-            word="$opt $word"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                # mkm find target scope <target>
+                if [ $len -le 5 ] ; then
+                    word="`mkm list target $scope 2>/dev/null \
+                    | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
+                    | tr ' ' '\n' \
+                    | sed '/^$/d' \
+                    | sort -u`"
+                    word="$word"
+                fi
+            elif [ $len -le 4 ] ; then
+                # mkm find target <scope> <target>
+                word="`mkm list target 2>/dev/null \
+                      | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
+                      | tr ' ' '\n' \
+                      | sed '/^$/d' \
+                      | sort -u`"
+                word="$opt $word"
+            fi
+            COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+            return 0
         fi
 
         if [ "$mod" = "module" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list module $scope 2>/dev/null \
-                  | awk '{print $1}' \
-                  | sort -u`"
-            word="$opt $word"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                # mkm find module scope <module>
+                if [ $len -le 5 ] ; then
+                    word="`mkm list module $scope 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+            elif [ $len -le 4 ] ; then
+                # mkm find module <scope> <module>
+                word="`mkm list module 2>/dev/null \
+                      | awk '{print $1}' \
+                      | sort -u`"
+                word="$opt $word"
+            fi
+            COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+            return 0
         fi
 
         if [ "$mod" = "config" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list config $scope 2>/dev/null \
-                  | awk '{print $1}' \
-                  | sort -u`"
-            word="$opt $word"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                # mkm find config scope <module>
+                if [ $len -le 5 ] ; then
+                    word="`mkm list config $scope 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+            elif [ $len -le 4 ] ; then
+                # mkm find config <scope> <module>
+                word="`mkm list config 2>/dev/null \
+                      | awk '{print $1}' \
+                      | sort -u`"
+                word="$opt $word"
+            fi
+            COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+            return 0
         fi
 
-        # TODO: find command commandtpl targetreg
-        COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+        if [ "$mod" = "command" ] ; then
+            scope="${COMP_WORDS[3]}"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                if [ $len -le 5 ] ; then
+                    # mkm find command scope <target>
+                    word="`mkm list command $scope 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$word"
+                elif [ $len -le 6 ] ; then
+                    # mkm find command scope target <cmdtype>
+                    target="${COMP_WORDS[4]}"
+                    word="`mkm list command $scope 2>/dev/null \
+                          | grep -w -P "^$target[ \t]*" \
+                          | awk '{print $2}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+                # no need auto-complete
+            else
+                if [ $len -le 4 ] ; then
+                    # mkm find command <scope> <target>
+                    word="`mkm list command 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$opt $word"
+                elif [ $len -le 5 ] ; then
+                    # mkm find command target <cmdtype>
+                    target="${COMP_WORDS[3]}"
+                    word="`mkm list command 2>/dev/null \
+                          | grep -w -P "^$target[ \t]*" \
+                          | awk '{print $2}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+                # no need auto-complete
+            fi
+            COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+            return 0
+        fi
+
+        if [ "$mod" = "commandtpl" ] ; then
+            scope="${COMP_WORDS[3]}"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                if [ $len -le 5 ] ; then
+                    # mkm find commandtpl scope <module>
+                    word="`mkm list commandtpl $scope 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$word"
+                elif [ $len -le 6 ] ; then
+                    # mkm find commandtpl scope module <cmdtype>
+                    module="${COMP_WORDS[4]}"
+                    word="`mkm list commandtpl $scope 2>/dev/null \
+                          | grep -w -P "^$module[ \t]*" \
+                          | awk '{print $2}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+                # no need auto-complete
+            else
+                if [ $len -le 4 ] ; then
+                    # mkm find commandtpl <scope> <module>
+                    word="`mkm list commandtpl 2>/dev/null \
+                          | awk '{print $1}' \
+                          | sort -u`"
+                    word="$opt $word"
+                elif [ $len -le 5 ] ; then
+                    # mkm find commandtpl module <cmdtype>
+                    module="${COMP_WORDS[3]}"
+                    word="`mkm list commandtpl 2>/dev/null \
+                          | grep -w -P "^$module[ \t]*" \
+                          | awk '{print $2}' \
+                          | sort -u`"
+                    word="$word"
+                fi
+                # no need auto-complete
+            fi
+            COMPREPLY=( $(compgen -W "$word" -- "$cur") )
+            return 0
+        fi
+
+        if [ "$mod" = "targetreg" ] ; then
+            scope="${COMP_WORDS[3]}"
+            if [ "$scope" = "--system" -o "$scope" = "--global" ] ; then
+                # mkm find targetreg scope <target>
+                if [ $len -le 5 ] ; then
+                    COMPREPLY=( $(compgen -f -- "$cur") )
+                    return 0
+                fi
+            elif [ $len -le 4 ] ; then
+                # mkm find targetreg <scope> <target>
+                COMPREPLY=( $(compgen -W "$opt" -f -- "$cur") )
+                return 0
+            fi
+        fi
         return 0
     fi
     if [ "$cmd" = "del" ] ; then
