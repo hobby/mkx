@@ -16,6 +16,8 @@
 #                 error  -> STDERR(红色)
 #                 normal -> STDOUT(绿色)
 #                 debug  -> STDOUT(黄色)
+#     2016/01/23: debug日志应该输出到STDERR
+#                 只有normal日志能输出到STDOUT
 #
 ############################################################
 
@@ -42,5 +44,5 @@ then
     echo "`greentext $*`"
 elif [ "$type" = "debug" ]
 then
-    if [ -n "$debug" ] ; then echo "`yellowtext $*`" ; fi
+    if [ -n "$debug" ] ; then echo "`yellowtext $*`" >&2; fi
 fi

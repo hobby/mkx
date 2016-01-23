@@ -13,6 +13,7 @@
 #     2015/12/27: 支持自动补充mk/mkd/mkc(-f/-C选项)
 #     2016/01/10: 支持自动补充mkr/mkt/mks
 #     2016/01/22: 支持自动补充mkrun/mkm
+#     2016/01/23: 解决无法正常输出带有#的配置问题
 #
 ############################################################
 
@@ -233,8 +234,7 @@ function _complete_callback_mkr()
     targets="`make ${makeflags} -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
     if [[ "$targets" == "" ]] ; then
         # target not fond, try configed-targets
-        targets="`mkm list target 2>&1
-                 | grep -v '#'
+        targets="`mkm list target 2>/dev/null
                  | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}'
                  | tr ' ' '\n'
                  | sed '/^$/d'
@@ -262,10 +262,10 @@ function _complete_callback_mkrun()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [ $len -le 2 ] ; then
         # mkrun <> or mkrun <cmdtype>
-        word="`mkm list command 2>&1 | grep -v '#' | awk '{print $2}' | sort -u`"
+        word="`mkm list command 2>/dev/null | awk '{print $2}' | sort -u`"
     else
         # mkrun cmdtype <target> ...
-        word="`mkm list command 2>&1 | grep -v '#' | awk '{print $1}' | sort -u`"
+        word="`mkm list command 2>/dev/null | awk '{print $1}' | sort -u`"
     fi
     COMPREPLY=( $(compgen -W "$word" -- "$cur") )
 
@@ -316,8 +316,7 @@ function _complete_callback_mkm()
     if [ "$cmd" = "find" ] ; then
         if [ "$mod" = "target" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list target $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list target $scope 2>/dev/null \
                   | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
                   | tr ' ' '\n' \
                   | sed '/^$/d' \
@@ -327,8 +326,7 @@ function _complete_callback_mkm()
 
         if [ "$mod" = "module" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list module $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list module $scope 2>/dev/null \
                   | awk '{print $1}' \
                   | sort -u`"
             word="$opt $word"
@@ -336,8 +334,7 @@ function _complete_callback_mkm()
 
         if [ "$mod" = "config" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list config $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list config $scope 2>/dev/null \
                   | awk '{print $1}' \
                   | sort -u`"
             word="$opt $word"
@@ -350,8 +347,7 @@ function _complete_callback_mkm()
     if [ "$cmd" = "del" ] ; then
         if [ "$mod" = "target" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list target $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list target $scope 2>/dev/null \
                   | awk '{for(i=3;i<=NF;i++) printf $i""FS; print ""}' \
                   | tr ' ' '\n' \
                   | sed '/^$/d' \
@@ -361,8 +357,7 @@ function _complete_callback_mkm()
 
         if [ "$mod" = "module" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list module $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list module $scope 2>/dev/null \
                   | awk '{print $1}' \
                   | sort -u`"
             word="$opt $word"
@@ -370,8 +365,7 @@ function _complete_callback_mkm()
 
         if [ "$mod" = "config" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list config $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list config $scope 2>/dev/null \
                   | awk '{print $1}' \
                   | sort -u`"
             word="$opt $word"
@@ -384,8 +378,7 @@ function _complete_callback_mkm()
     if [ "$cmd" = "get" ] ; then
         if [ "$mod" = "config" ] ; then
             scope="${COMP_WORDS[3]}"
-            word="`mkm list config $scope 2>&1 \
-                  | grep -v '#' \
+            word="`mkm list config $scope 2>/dev/null \
                   | awk '{print $1}' \
                   | sort -u`"
             word="$opt $word"
