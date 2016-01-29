@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mk
-#     mk [ -f makefile ] [ -C directory ] [ targets ] ...
+#     mk [ -f makefile ] [ -C directory ] [ -j [max-jobs] ] [ targets ] ...
 #
 #     debug=on mk ...
 #
@@ -16,6 +16,8 @@
 #
 # VERSION
 #     2015/12/11: 支持目录递归、编译前/后自定义命令
+#     2016/01/29: 支持自定义make选项, 配置名称: make-flags
+#                 (允许静态配置[文本]或者动态配置[命令])
 #
 ############################################################
 
@@ -63,10 +65,14 @@ cd "$makedir"
 eval "$cmd"
 cd "$pwd"
 
+# make flags
+makeflags="`mkm get config make-flags`"
+mklog debug "make-flags:[$makeflags]"
+
 # make targets
-make $* $targets
+eval make $makeflags $* $targets
 if [ $? -ne 0 ] ; then
-    mklog error "make fail, make args:[$* $targets]"
+    mklog error "make fail, make args:[$makeflags $* $targets]"
     exit 1
 fi
 

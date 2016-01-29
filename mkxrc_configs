@@ -6,3 +6,5 @@ pre-make = echo this is pre-make code
 # post-make: execute after make (for mkd)
 post-make = echo this is post-make code
 
+# make-flags: make flags (for mk)
+make-flags = "-j`cat /proc/cpuinfo | grep processor | wc -l`"

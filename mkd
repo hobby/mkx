@@ -7,7 +7,7 @@
 #
 # SYNOPSIS
 #     mkd
-#     mkd [ -f makefile ] [ -C directory ] [ targets ] ...
+#     mkd [ -f makefile ] [ -C directory ] [ -j [max-jobs] ] [ targets ] ...
 # 
 #     debug=on mkd ...
 #
@@ -38,6 +38,7 @@
 #     2015/12/11: 支持使用mk工具编译target
 #     2015/12/23: 支持模式匹配target
 #     2015/12/26: 支持忽略pre/post-deploy命令错误信息
+#     2016/01/29: 支持透传make -j选项(并行编译)
 #
 ############################################################
 
@@ -47,9 +48,9 @@ cmdline="$*"
 targets=""
 makedir="`pwd`"
 makefile=""
-temp=$(getopt -o "f:C:" --long "" -n "$0" -- "$@")
+temp=$(getopt -o "f:C:j::" --long "" -n "$0" -- "$@")
 if [ $? != 0 ] ; then
-    echo "Usage: $0 [ -f makefile ] [ -C directory ] [ targets ] ..." >&2
+    echo "Usage: $0 [ -f makefile ] [ -C directory ] [ -j [max-jobs] ] [ targets ] ..." >&2
     exit 1
 fi
 eval set -- "$temp"
@@ -58,6 +59,7 @@ do
     case "$1" in
         -C) makedir="$2" ;  shift 2 ;;
         -f) makefile="$2" ; shift 2 ;;
+        -j) shift 2;;
         --) shift ; break ;;
         *)  echo "parse options error!" >&2 ; exit 1 ;;
     esac

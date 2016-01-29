@@ -170,7 +170,7 @@ do
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \
-                        "supported type:[rsa, local, local]"
+                        "supported type:[rsa, local, passwd]"
             exit 1
             ;;
     esac
