@@ -18,6 +18,8 @@
 #                 debug  -> STDOUT(黄色)
 #     2016/01/23: debug日志应该输出到STDERR
 #                 只有normal日志能输出到STDOUT
+#     2016/01/31: 支持提示级日志(不含换行符)
+#                 tip    -> STDOUT(紫色)
 #
 ############################################################
 
@@ -42,6 +44,9 @@ then
 elif [ "$type" = "normal" ]
 then
     echo "`greentext $*`"
+elif [ "$type" = "tip" ]
+then
+    echo -n "`pinktext "$*"`"
 elif [ "$type" = "debug" ]
 then
     if [ -n "$debug" ] ; then echo "`yellowtext $*`" >&2; fi

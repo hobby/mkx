@@ -2,3 +2,12 @@
 # vim:ts=4:sw=4:expandtab
 
 make clean $*
+
+# cleanup mkx makefile if exist
+makefile_org="`make $* -n -p | grep '^MAKEFILE_LIST' | awk '{printf $3}'`"
+makefile_mkx=".$makefile_org.mkx"
+mklog debug "makefile_org:[$makefile_org], makefile_mkx:[$makefile_mkx]"
+if [ -e "$makefile_mkx" ] ; then
+    mklog debug "deleting mkx makefile, makefile_mkx:[$makefile_mkx]"
+    rm -f "$makefile_mkx"
+fi
