@@ -1,13 +1,146 @@
 #!/bin/bash
 # vim:ts=4:sw=4:expandtab
 
-make clean $*
+############################################################
+# NAME
+#     mkc - a toy for clean targets with make.
+#
+# SYNOPSIS
+#     mkc
+#     mkc [ options ] ...
+#
+#     debug=on mkc ...
+#
+# OPTIONS
+#       -C DIRECTORY  Change to DIRECTORY before doing anything.
+#       -f FILE       Read FILE as a makefile.
+#       -h            Print this message and exit.
+#       -n            Don't actually run any commands; just print them.
+#       -p            Print make's internal database.
+#
+#       -x            Don't use mkx makefile.
+#       -z            Don't use make-flags config.
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com>
+#
+# VERSION
+#     2016/02/03: 支持目录级clean
+#                 支持自定义选项(make选项的子集)
+#                 支持自动清理mkx makefile
+#
+############################################################
+
+# help
+function help()
+{
+    echo "Usage: mkc [options ]"
+    echo "Options:"
+    echo "  -C DIRECTORY  Change to DIRECTORY before doing anything."
+    echo "  -f FILE       Read FILE as a makefile."
+    echo "  -h            Print this message and exit."
+    echo "  -n            Don't actually run any commands; just print them."
+    echo "  -p            Print make's internal database."
+    echo ""
+    echo "Report bugs to <ku7d@qq.com>"
+}
+
+# mkc -C {makedir} -f {makefile} {cmdline_options}
+makedir=""
+makefile=""
+cmdline_options=""
+
+# parse cmdline
+mklog debug "origin-args:[$@]"
+temp=$(getopt -o "C:f:hnp" --long "" -n "mkc" -- "$@")
+if [ $? != 0 ] ; then
+    echo "`help`" >&2
+    exit 1
+fi
+eval set -- "$temp"
+mklog debug "parsed-args:[$temp]"
+while true
+do
+    case "$1" in
+        -C) makedir="$2" ;  shift 2 ;;
+        -f) makefile="$2" ; shift 2 ;;
+        -h) echo "`help`" >&2; exit 0;;
+        -n) cmdline_options="$cmdline_options -n"; shift 1;;
+        -p) cmdline_options="$cmdline_options -p"; shift 1;;
+        --) shift ; break ;;
+        *)  echo "parse options error!" >&2 ; exit 1 ;;
+    esac
+done
+mklog debug "makedir:[$makedir], makefile:[$makefile]," \
+            "cmdline_options:[$cmdline_options]"
+
+# wrapper
+succ_exit() { [ -n "$makedir" ] && echo "mk: Leaving directory '$makedir'"; exit 0; }
+fail_exit() { [ -n "$makedir" ] && echo "mk: Leaving directory '$makedir'"; exit 1; }
+
+# go into make directory if need
+if [ -n "$makedir" ] ; then
+    if [ ! -d "$makedir" ] ; then
+        mklog error "check directory fail, directory:[$makedir]"
+        exit 1
+    fi
+
+    echo "mk: Entering directory '$makedir'"
+    cd "$makedir" || fail_exit
+fi
+
+# get makefile from cmdline(by user) or make(auto load)
+if [ -z "$makefile" ] ; then
+    makefile="`make $cmdline_options -n -p 2>/dev/null \
+              | grep '^MAKEFILE_LIST' \
+              | head -n1 \
+              | awk '{printf $3}'`"
+    if [ -z "$makefile" ] ; then
+        mklog error "makefile not found, make args:[$cmdline_options]"
+        fail_exit
+    fi
+fi
+if [ ! -f "$makefile" ] ; then
+    mklog error "check makefile fail, makefile:[$makefile]"
+    fail_exit
+fi
+mklog debug "makefile:[$makefile]"
+
+# get make's internal database
+makedata="`make -f $makefile $cmdline_options -n -p 2>/dev/null`"
+
+# maybe mk for sub directorys
+submakedirs="`echo "$makedata" | grep '^DIRS =' | tail -n1 | cut -c8-`"
+mklog debug "submakedirs=$submakedirs"
+if [ -n "$submakedirs" ] ; then
+    for subdir in $submakedirs
+    do
+        if [ "${subdir:0:1}" = "/" ] ; then
+            mkc -C $subdir $cmdline_options
+        else
+            mkc -C `pwd`/$subdir $cmdline_options
+        fi
+    done
+    mklog debug "mkc for directorys end"
+    succ_exit
+fi
+
+# make targets with $makefile
+make="make -f $makefile $cmdline_options clean"
+mklog debug "make command:[$make]"
+eval $make
+if [ $? -ne 0 ] ; then
+    mklog error "make fail, make command:[$make]"
+    fail_exit
+fi
 
 # cleanup mkx makefile if exist
-makefile_org="`make $* -n -p | grep '^MAKEFILE_LIST' | awk '{printf $3}'`"
-makefile_mkx=".$makefile_org.mkx"
-mklog debug "makefile_org:[$makefile_org], makefile_mkx:[$makefile_mkx]"
+makefile_mkx=".$makefile.mkx"
+mklog debug "makefile:[$makefile], makefile_mkx:[$makefile_mkx]"
 if [ -e "$makefile_mkx" ] ; then
     mklog debug "deleting mkx makefile, makefile_mkx:[$makefile_mkx]"
     rm -f "$makefile_mkx"
 fi
+
+# all done
+succ_exit
