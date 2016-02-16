@@ -18,9 +18,6 @@
 #       -n            Don't actually run any commands; just print them.
 #       -p            Print make's internal database.
 #
-#       -x            Don't use mkx makefile.
-#       -z            Don't use make-flags config.
-#
 # AUTHORS
 #     neiku project <ku7d@qq.com>
 #
@@ -34,7 +31,7 @@
 # help
 function help()
 {
-    echo "Usage: mkc [options ]"
+    echo "Usage: mkc [ options ]"
     echo "Options:"
     echo "  -C DIRECTORY  Change to DIRECTORY before doing anything."
     echo "  -f FILE       Read FILE as a makefile."
@@ -75,8 +72,8 @@ mklog debug "makedir:[$makedir], makefile:[$makefile]," \
             "cmdline_options:[$cmdline_options]"
 
 # wrapper
-succ_exit() { [ -n "$makedir" ] && echo "mk: Leaving directory '$makedir'"; exit 0; }
-fail_exit() { [ -n "$makedir" ] && echo "mk: Leaving directory '$makedir'"; exit 1; }
+succ_exit() { [ -n "$makedir" ] && echo "mkc: Leaving directory '$makedir'"; exit 0; }
+fail_exit() { [ -n "$makedir" ] && echo "mkc: Leaving directory '$makedir'"; exit 1; }
 
 # go into make directory if need
 if [ -n "$makedir" ] ; then
@@ -85,7 +82,7 @@ if [ -n "$makedir" ] ; then
         exit 1
     fi
 
-    echo "mk: Entering directory '$makedir'"
+    echo "mkc: Entering directory '$makedir'"
     cd "$makedir" || fail_exit
 fi
 
@@ -109,7 +106,7 @@ mklog debug "makefile:[$makefile]"
 # get make's internal database
 makedata="`make -f $makefile $cmdline_options -n -p 2>/dev/null`"
 
-# maybe mk for sub directorys
+# maybe mkc for sub directorys
 submakedirs="`echo "$makedata" | grep '^DIRS =' | tail -n1 | cut -c8-`"
 mklog debug "submakedirs=$submakedirs"
 if [ -n "$submakedirs" ] ; then

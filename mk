@@ -47,7 +47,7 @@
 # help
 function help()
 {
-    echo "Usage: mk [options ] [target] ..."
+    echo "Usage: mk [ options ] [ targets ] ..."
     echo "Options:"
     echo "  -C DIRECTORY  Change to DIRECTORY before doing anything."
     echo "  -f FILE       Read FILE as a makefile."

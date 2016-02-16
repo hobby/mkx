@@ -24,7 +24,7 @@
 #
 #     mkm path config [ --global | --system ]
 #     mkm list config [ --global | --system ]
-#     mkm get  config [ --global | --system ] key
+#     mkm get  config [ --global | --system ] key [default-config]
 #     mkm find config [ --global | --system ] key
 #     mkm del  config [ --global | --system ] keys
 #     mkm add  config [ --global | --system ] key = vaule
@@ -67,6 +67,7 @@
 #     2015/12/12: bugfix: get config去空白得在find之后马上执行
 #                 支持命令模板(可配置不同模块的不同命令模板)
 #     2015/12/16: 支持模式匹配target(TODO: 支持del targetreg)
+#     2016/02/16: get config支持默认配置
 #
 ############################################################
 
@@ -119,7 +120,7 @@ function showhelp()
     echo
     echo "    mkm path config [ --global | --system ]"
     echo "    mkm list config [ --global | --system ]"
-    echo "    mkm get  config [ --global | --system ] key"
+    echo "    mkm get  config [ --global | --system ] key [default-config]"
     echo "    mkm find config [ --global | --system ] key"
     echo "    mkm del  config [ --global | --system ] keys..."
     echo "    mkm add  config [ --global | --system ] key = value"
@@ -368,13 +369,15 @@ if [ $mod = "config" ] ; then
         [ -z "$1" ] && showhelp && exit 1
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            val="`mkm find config $* | sed "s/^[ \t]*$2[ \t]*=[ \t]*//g"`"
+            val="`mkm find config $1 $2 | sed "s/^[ \t]*$2[ \t]*=[ \t]*//g"`"
+            [ -z "$val" ] && val="$3"
             [ -n "$val" ] && echo "$val"
             exit
         fi
-        val="`mkm find config $* | sed "s/^[ \t]*$1[ \t]*=[ \t]*//g"`"
+        val="`mkm find config $1 $2 | sed "s/^[ \t]*$1[ \t]*=[ \t]*//g"`"
         [ -z "$val" ] && val="`mkm find config --global $1`"
         [ -z "$val" ] && val="`mkm find config --system $1`"
+        [ -z "$val" ] && val="$2"
         [ -n "$val" ] && echo "$val"
         exit
         ;;
