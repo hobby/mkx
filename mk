@@ -41,6 +41,8 @@
 #                 支持自定义选项(make选项集的子集 + mk扩展)
 #                 支持-x临时不使用mkx makefile
 #                 支持-z临时不使用make-flags配置
+#     2016/02/16: 支持自定义默认target变量名(key => output-name)
+#                 (默认使用OUTPUT做为默认target变量名)
 #
 ###########################################################################
 
@@ -154,10 +156,13 @@ fi
 
 # get targets makefile if need
 if [ -z "$cmdline_targets" ] ; then
-    # default targets from OUTPUT var in makefile
-    makefile_targets="`echo "$makedata" | grep '^OUTPUT =' | cut -c10-`"
+    # default targets from $output var in makefile
+    output="`mkm get config output-name OUTPUT`"
+    length="$((${#output} + 4))"
+    makefile_targets="`echo "$makedata" | grep "^$output =" | cut -c$length-`"
     if [ -z "$makefile_targets" ] ; then
-        mklog error "targets not found, make args:[$cmdline_options]"
+        mklog error "targets not found, make args:[$cmdline_options]," \
+                    "output-name:[$output], length:[$length]"
         fail_exit
     fi
     cmdline_targets="$makefile_targets"

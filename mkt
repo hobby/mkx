@@ -23,6 +23,8 @@
 #     2015/11/21: 简单封装mkrun，支持关闭
 #                 命令行或者makefile中OUTPUT定义的target
 #     2015/12/03: 支持目录递归查找target
+#     2016/02/16: 支持自定义默认target变量名(key => output-name)
+#                 (默认使用OUTPUT做为默认target变量名)
 #
 ############################################################
 
@@ -72,13 +74,16 @@ fi
 targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
 if [ -z "$targets" ]
 then
-    # default targets from OUTPUT var in makefile
-    targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
-fi
-if [ -z "$targets" ]
-then
-    mklog error "targets not found, make args:[$*]"
-    exit 1
+    # default targets from $output var in makefile
+    output="`mkm get config output-name OUTPUT`"
+    length="$((${#output} + 4))"
+    targets="`make $* -n -p 2>/dev/null | grep "^$output =" | cut -c$length-`"
+    if [ -z "$targets" ]
+    then
+        mklog error "targets not found, make args:[$*]," \
+                    "output-name:[$output], length:[$length]"
+        exit 1
+    fi
 fi
 mklog debug "targets:[$targets]"
 

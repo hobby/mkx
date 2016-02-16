@@ -39,6 +39,8 @@
 #     2015/12/23: 支持模式匹配target
 #     2015/12/26: 支持忽略pre/post-deploy命令错误信息
 #     2016/01/29: 支持透传make -j选项(并行编译)
+#     2016/02/16: 支持自定义默认target变量名(key => output-name)
+#                 (默认使用OUTPUT做为默认target变量名)
 #
 ############################################################
 
@@ -106,15 +108,18 @@ else
         exit 0
     fi
 
-    # get rgets from cmdline
+    # get targets from cmdline
     targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
     if [ -z "$targets" ] ; then
-        # default targets from OUTPUT var in makefile
-        targets="`make $* -n -p 2>/dev/null | grep '^OUTPUT =' | cut -c10-`"
-    fi
-    if [ -z "$targets" ] ; then
-        mklog error "need-make targets not found, make args:[$*]"
-        exit 1
+        # default targets from $output var in makefile
+        output="`mkm get config output-name OUTPUT`"
+        length="$((${#output} + 4))"
+        targets="`make $* -n -p 2>/dev/null | grep "^$output =" | cut -c$length-`"
+        if [ -z "$targets" ] ; then
+            mklog error "need-make targets not found, make args:[$*]," \
+                        "output-name:[$output], length:[$length]"
+            exit 1
+        fi
     fi
     mklog debug "targets(need make):[$targets]"
 

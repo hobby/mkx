@@ -16,6 +16,8 @@
 #     2016/01/23: 解决无法正常输出带有#的配置问题
 #                 完善mkm find所有子模块的自动补全
 #                 完善mkm del所有子模块的自动补全
+#     2016/02/16: 支持自定义默认target变量名(key => output-name)
+#                 (默认使用OUTPUT做为默认target变量名)
 #
 ############################################################
 
@@ -119,7 +121,9 @@ function _complete_callback_mk()
         COMPREPLY=( "-C" )
         return 0
     fi
-    targets="`make ${makeflags} -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
+    output="`mkm get config output-name OUTPUT`"
+    length="$((${#output} + 4))"
+    targets="`make ${makeflags} -n -p 2>/dev/null | grep "^$output =" | tail -n1 | cut -c$length-`"
     if [[ "$targets" == "" ]] ; then
         # target not fond, just compete for file
         COMPREPLY=( $(compgen -W "`ls`" -- "$cur") )
@@ -233,7 +237,9 @@ function _complete_callback_mkr()
         COMPREPLY=( "-C" )
         return 0
     fi
-    targets="`make ${makeflags} -n -p 2>/dev/null | grep '^OUTPUT =' | tail -1 | cut -c10-`"
+    output="`mkm get config output-name OUTPUT`"
+    length="$((${#output} + 4))"
+    targets="`make ${makeflags} -n -p 2>/dev/null | grep "^$output =" | tail -n1 | cut -c$length-`"
     if [[ "$targets" == "" ]] ; then
         # target not fond, try configed-targets
         targets="`mkm list target 2>/dev/null
