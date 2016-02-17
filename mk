@@ -38,7 +38,7 @@
 #                 模板预定义变量:
 #                 用户当前使用makefile: {_origin_makefile_}
 #     2016/02/03: 支持目录级增量编译
-#                 支持自定义选项(make选项集的子集 + mk扩展)
+#                 支持自定义选项(make选项集的子集 + mkx扩展)
 #                 支持-x临时不使用mkx makefile
 #                 支持-z临时不使用make-flags配置
 #     2016/02/16: 支持自定义默认target变量名(key => output-name)
@@ -101,7 +101,8 @@ done
 cmdline_targets="$@"
 mklog debug "makedir:[$makedir], makefile:[$makefile]," \
             "cmdline_options:[$cmdline_options], cmdline_targets:[$cmdline_targets]," \
-            "using_mkx_makefile_cmdline:[$using_mkx_makefile_cmdline]"
+            "using_mkx_makefile_cmdline:[$using_mkx_makefile_cmdline]," \
+            "using_makeflags_cmdline:[$using_makeflags_cmdline]"
 
 # wrapper
 succ_exit() { [ -n "$makedir" ] && echo "mk: Leaving directory '$makedir'"; exit 0; }

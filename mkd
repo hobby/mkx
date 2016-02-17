@@ -7,9 +7,19 @@
 #
 # SYNOPSIS
 #     mkd
-#     mkd [ -f makefile ] [ -C directory ] [ -j [max-jobs] ] [ targets ] ...
-# 
+#     mkd [ options ] [ targets ] ...
+#
 #     debug=on mkd ...
+#
+# OPTIONS
+#       -C DIRECTORY  Change to DIRECTORY before doing anything.
+#       -f FILE       Read FILE as a makefile.
+#       -h            Print this message and exit.
+#       -j [N]        Allow N jobs at once; infinite jobs with no arg.
+#       -l [N]        Don't start multiple jobs unless load is below N.
+#
+#       -x            Don't use mkx makefile.
+#       -z            Don't use make-flags config.
 #
 # AUTHORS
 #     neiku project <ku7d@qq.com> 
@@ -41,92 +51,143 @@
 #     2016/01/29: 支持透传make -j选项(并行编译)
 #     2016/02/16: 支持自定义默认target变量名(key => output-name)
 #                 (默认使用OUTPUT做为默认target变量名)
+#     2016/02/17: 支持自定义选项(make选项集的子集 + mkx扩展)
+#                 支持-x临时不使用mkx makefile(透传mk)
+#                 支持-z临时不使用make-flags配置(透传mk)
 #
 ############################################################
 
 # target(*) <-----> module(1) <-----> deploy destination(1)
 
-cmdline="$*"
-targets=""
-makedir="`pwd`"
-makefile=""
-temp=$(getopt -o "f:C:j::" --long "" -n "$0" -- "$@")
+# help
+function help()
+{
+    echo "Usage: mkd [ options ] [ targets ] ..."
+    echo "Options:"
+    echo "  -C DIRECTORY  Change to DIRECTORY before doing anything."
+    echo "  -f FILE       Read FILE as a makefile."
+    echo "  -j [N]        Allow N jobs at once; infinite jobs with no arg."
+    echo "  -h            Print this message and exit."
+    echo "  -l [N]        Don't start multiple jobs unless load is below N."
+    echo ""
+    echo "  -x            Don't use mkx makefile."
+    echo "  -z            Don't use make-flags config."
+    echo ""
+    echo "Report bugs to <ku7d@qq.com>"
+}
+
+# mkd -C {cmdline_makedir} -f {cmdline_makefile} {cmdline_options} {cmdline_targets}
+cmdline_makedir="`pwd`"
+cmdline_makefile=""
+cmdline_options=""
+cmdline_options_x=""
+cmdline_options_z=""
+cmdline_targets=""
+
+# parse cmdline
+cmdline="$@"
+mklog debug "origin-args:[$@]"
+temp=$(getopt -o "C:f:hj::l::xz" --long "" -n "mkd" -- "$@")
 if [ $? != 0 ] ; then
-    echo "Usage: $0 [ -f makefile ] [ -C directory ] [ -j [max-jobs] ] [ targets ] ..." >&2
+    echo "`help`" >&2
     exit 1
 fi
 eval set -- "$temp"
+mklog debug "parsed-args:[$temp]"
 while true
 do
     case "$1" in
-        -C) makedir="$2" ;  shift 2 ;;
-        -f) makefile="$2" ; shift 2 ;;
-        -j) shift 2;;
+        -C) cmdline_makedir="$2" ;  shift 2 ;;
+        -f) cmdline_makefile="$2" ; shift 2 ;;
+        -h) echo "`help`" >&2; exit 0;;
+        -j) cmdline_options="$cmdline_options -j$2"; shift 2;;
+        -l) cmdline_options="$cmdline_options -l$2"; shift 2;;
+        -x) cmdline_options_x="-x"; shift 1;;
+        -z) cmdline_options_z="-z"; shift 1;;
         --) shift ; break ;;
         *)  echo "parse options error!" >&2 ; exit 1 ;;
     esac
 done
-mklog debug "makdir-cmdline:[$makedir], makefile-cmdline:[$makefile], args-remained:[$*]"
+cmdline_targets="$@"
+mklog debug "cmdline_makedir:[$cmdline_makedir], cmdline_makefile:[$cmdline_makefile]," \
+            "cmdline_options:[$cmdline_options], cmdline_targets:[$cmdline_targets]," \
+            "cmdline_options_x:[$cmdline_options_x], cmdline_options_z:[$cmdline_options_z]"
 
-if [ -z "$makefile" -a -z "`ls $makedir/{GNUmakefile,makefile,Makefile} 2>/dev/null`" ] ; then
-    # makefile not found, maybe none-make target (from cmdline)
-    targets="$*"
-    if [ -z "$targets" ] ; then
-        # default targets is regular file in `makedir`
-        targets="`find "$makedir" -maxdepth 1 -type f -exec basename '{}' \; 2>/dev/null`"
-    fi
-    if [ -z "$targets" ] ; then
-        mklog error "none-make targets not found, cmdline:[$cmdline]"
+# (using $makefile to make and) deploy $targets from $makedir
+targets="$cmdline_targets"
+makedir="$cmdline_makedir"
+makefile="$cmdline_makefile"
+
+# wrapper
+succ_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$cmdline_makedir'"; exit 0; }
+fail_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$cmdline_makedir'"; exit 1; }
+
+# go into make directory if need
+if [ -n "$makedir" ] ; then
+    if [ ! -d "$makedir" ] ; then
+        mklog error "check directory fail, directory:[$makedir]"
         exit 1
     fi
-    mklog debug "targets(none make):[$targets]"
-else
-    # recover origin args for need-make target
-    eval set -- "$cmdline"
 
-    # get make directory
-    makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
-    if [ -z "$makedir" ] ; then
-        mklog error "make directory not found, make args:[$*]"
-        exit 1
+    echo "mkd: Entering directory '$makedir'"
+    cd "$makedir" || fail_exit
+fi
+
+# get makefile from cmdline(by user) or make(auto load)
+if [ -z "$makefile" ] ; then
+    makefile="`make $cmdline_options $cmdline_targets -n -p 2>/dev/null \
+               | grep '^MAKEFILE_LIST' \
+               | head -n1 \
+               | awk '{printf $3}'`"
+    if [ -z "$makefile" -a -z "$targets" ] ; then
+        mklog error "none-make targets not found, cmdline:[$cmdline]," \
+                    "makefile:[$makefile], targets:[$targets]"
+        fail_exit
     fi
-    mklog debug "makedir:[$makedir]"
+fi
+mklog debug "makefile:[$makefile], targets:[$targets]"
+
+if [ -n "$makefile" ] ; then
+    # check makefile
+    if [ ! -f "$makefile" ] ; then
+        mklog error "check makefile fail, makefile:[$makefile]"
+        fail_exit
+    fi
 
     # maybe mkd for sub directorys
-    submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+    submakedirs="`make -f $makefile -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
     mklog debug "submakedirs=$submakedirs"
     if [ -n "$submakedirs" ] ; then
         for subdir in $submakedirs
         do
             if [ "${subdir:0:1}" = "/" ] ; then
-                mkd -C $subdir
+                mkd -C $subdir $cmdline_options
             else
-                mkd -C $makedir/$subdir
+                mkd -C $makedir/$subdir $cmdline_options
             fi
         done
         mklog debug "mkd for directorys end"
-        exit 0
+        succ_exit
     fi
 
     # get targets from cmdline
-    targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
     if [ -z "$targets" ] ; then
         # default targets from $output var in makefile
         output="`mkm get config output-name OUTPUT`"
         length="$((${#output} + 4))"
-        targets="`make $* -n -p 2>/dev/null | grep "^$output =" | cut -c$length-`"
+        targets="`make -f $makefile -n -p 2>/dev/null | grep "^$output =" | cut -c$length-`"
         if [ -z "$targets" ] ; then
-            mklog error "need-make targets not found, make args:[$*]," \
+            mklog error "need-make targets not found, cmdline:[$cmdline]," \
                         "output-name:[$output], length:[$length]"
-            exit 1
+            fail_exit
         fi
     fi
     mklog debug "targets(need make):[$targets]"
 
-    # make targets
-    mk $*
+    # make targets from cmdline(by user) or make(auto load)
+    mk -f $makefile $cmdline_options $cmdline_options_x $cmdline_options_z $targets
     if [ $? -ne 0 ] ; then
-        exit 1
+        fail_exit
     fi
 fi
 
@@ -174,7 +235,7 @@ do
     if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
                     "supported type:[rsa, local, passwd], target:[$target]"
-        exit 1
+        continue
     fi
 
     # do deploy
@@ -185,7 +246,7 @@ do
                 -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
             then
                 mklog error "rsa module not ok, target:[$target], module:[$module]"
-                exit 1
+                continue
             fi
             scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
             ;;
@@ -197,15 +258,18 @@ do
                 -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
             then
                 mklog error "passwd module not ok, target:[$target], module:[$module]"
-                exit 1
+                continue
             fi
             mkscpto "$makedir/$target" $username $rsapkey $hostname $hostport $hostpath
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \
                         "supported type:[rsa, local, passwd]"
-            exit 1
+            continue
             ;;
     esac
     mkrun post-deploy $target 2>/dev/null
 done
+
+# all done
+succ_exit
