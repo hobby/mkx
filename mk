@@ -43,6 +43,15 @@
 #                 支持-z临时不使用make-flags配置
 #     2016/02/16: 支持自定义默认target变量名(key => output-name)
 #                 (默认使用OUTPUT做为默认target变量名)
+#     2016/03/13: 支持预设pre-make/post-make运行时变量
+#                 MKX_PWD     = current working directory
+#                 MKX_OPTIONS = command-line's options
+#                 MKX_TARGETS = targets to be maked
+#                 MKX_ORIGIN_MAKEDIR  = origin makedir  (-C)
+#                 MKX_ORIGIN_MAKEFILE = origin makefile (-f)
+#                 MKX_REAL_MAKEFILE   = real makefile (origin|mkx makefile)
+#                 (基于环境变量通信, 优于命令行方式通信)
+#                 支持捕捉依赖生成异常,避免生成垃圾(sed***)临时文件
 #
 ###########################################################################
 
@@ -174,7 +183,12 @@ cmd="`mkm get config pre-make`"
 mklog debug "pre-make:[$cmd]"
 if [ -n "$cmd" ] ; then
     pwd="`pwd`"
-    eval "$cmd"
+    eval "MKX_PWD='$pwd'; \
+          MKX_OPTIONS='$cmdline_options'; \
+          MKX_TARGETS='$cmdline_targets'; \
+          MKX_ORIGIN_MAKEDIR='$makedir'; \
+          MKX_ORIGIN_MAKEFILE='$makefile'; \
+          $cmd"
     if [ $? -ne 0 ] ; then
         mklog error "run pre-make fail, cmd:[$cmd]"
     fi
@@ -220,20 +234,29 @@ if [   "$using_mkx_makefile_config"  = "yes" \
     # update targets's deps into mkx makefile
     mklog tip "generate deps for"
     make -f $makefile_dep $cmdline_options $cmdline_targets -n 2>/dev/null \
-    | grep -P "(^g++|^gcc).*\.o$" \
+    | grep -P "(^g++|^gcc).*-c.*$" \
     | while read mkcmd; do
         # get deps with -MM (user defined dep)
-        depcmd="`echo -n "$mkcmd" | sed 's/-o[ \t]*[^ \t]*/-MM/'`"
-        dep="`eval $depcmd | tr -d '\\\\\n'`"
+        depcmd="`echo -n "$mkcmd" | sed -e 's/-o[ \t]*[^ \t]*//g' -e 's/$/ -MM/g'`"
+        dep="`eval $depcmd 2>&1`"
+        if [ $? -ne 0 ] ; then
+            echo -e "\n$dep"
+            mklog debug "gen deps fail, depcmd:[$depcmd]"
+            exit 1
+        fi                                      
+        dep="`echo -n "$dep" | tr -d '\\\\\n'`"
+        mklog debug "depcmd:[$depcmd], dep:[$dep]"
 
         # update deps (generally speaking, $name will not empty here)
         name="`echo -n "$dep" | cut -d: -f1`"
-        sed -i "/$name/d" $makefile_mkx
-        echo "$dep" >> $makefile_mkx
+        if [ -n "$name" ] ; then
+            sed -i "/$name/d" $makefile_mkx
+            echo "$dep" >> $makefile_mkx
+        fi
 
         # progress
         mklog tip " $name"
-    done
+    done || fail_exit
     echo
 fi
 
@@ -259,7 +282,12 @@ cmd="`mkm get config post-make`"
 mklog debug "post-make:[$cmd]"
 if [ -n "$cmd" ] ; then
     pwd="`pwd`"
-    eval "$cmd"
+    eval "MKX_PWD='$pwd'; \
+          MKX_OPTIONS='$cmdline_options'; \
+          MKX_TARGETS='$cmdline_targets'; \
+          MKX_ORIGIN_MAKEDIR='$makedir'; \
+          MKX_REAL_MAKEFILE='$makefile'; \
+          $cmd"
     if [ $? -ne 0 ] ; then
         mklog error "run post-make fail, cmd:[$cmd]"
     fi
