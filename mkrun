@@ -33,6 +33,8 @@
 #     2015/12/11: 支持自定义命令类型
 #     2015/12/12: 支持命令模板(可配置不同模块的不同命令模板)
 #     2015/12/23: 支持模式匹配target
+#     2016/03/18: 支持通过环境变量与用户定义命令(模板)通信
+#                 (废弃基于sed的变量替换命令生成机制)
 #
 ##################################################################
 
@@ -93,7 +95,7 @@ do
     fi 
     mklog debug "target:[$target], cmdtype:[$cmdtype], command:[$command]"
     if [ -z "$command" ] ; then
-        # no command yet, try to build default command with tpl
+        # no command yet, try command tpl
         cmdtpl=""
         eval `mkm find commandtpl $module $cmdtype | while read moduledump typedump commandtpl
               do
@@ -105,20 +107,9 @@ do
                         "module:[$module], target:[$target], cmdtype:[$cmdtype]"
             continue
         fi
-        # $hostpath has '/', it is special-char in sed (s command)
-        # so, we use '=' for sed (s command)
-        command="`echo "$cmdtpl" | sed -e "s={module}=$module=g"     \
-                                       -e "s={target}=$target=g"     \
-                                       -e "s={cmdtype}=$cmdtype=g"   \
-                                       -e "s={hostpath}=$hostpath=g" \
-                                       2>/dev/null`"
-        if [ -z "$command" ] ; then
-            mklog error "build default '$cmdtype' command fail, module:[$module]," \
-                        "target:[$target], command tpl:[$cmdtpl]"
-            continue
-        fi
-        mklog debug "build default '$cmdtype' command succ, module:[$module], target:[$target]," \
-                    "command:[$command], command tpl:[$cmdtpl]"
+        mklog debug "module:[$module], target:[$target], command tpl:[$cmdtpl]"
+
+        command="$cmdtpl"
     fi
 
     # maybe command alias
@@ -144,6 +135,14 @@ do
         continue
     fi
 
+    # export env before running command
+    exportcmd="export"
+    exportcmd="$exportcmd MKX_MODULE='$module'"
+    exportcmd="$exportcmd MKX_TARGET='$target'"
+    exportcmd="$exportcmd MKX_MTYPE='$mtype'"
+    exportcmd="$exportcmd MKX_CMDTYPE='$cmdtype'"
+    exportcmd="$exportcmd MKX_HOSTPATH='$hostpath'"
+
     # run command
     mklog normal "run '$cmdtype' command for '$target' with command:[$command]"
     case "$mtype" in
@@ -154,10 +153,10 @@ do
                 mklog error "rsa module not ok, target:[$target], module:[$module]"
                 continue
             fi
-            ssh -i $rsapkey -p $hostport $username@$hostname "$command"
+            ssh -i $rsapkey -p $hostport $username@$hostname "$exportcmd; $command"
             ;;
         local)
-            eval "$command"
+            eval "$exportcmd; $command"
             ;;
         passwd)
             if [   -z "$username" -o -z "$rsapkey"  \
@@ -166,7 +165,7 @@ do
                 mklog error "passwd module not ok, target:[$target], module:[$module]"
                 exit 1
             fi
-            mkssh $username $rsapkey $hostname $hostport "$command"
+            mkssh $username $rsapkey $hostname $hostport "$exportcmd; $command"
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \

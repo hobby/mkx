@@ -52,6 +52,8 @@
 #                 MKX_REAL_MAKEFILE   = real makefile (origin|mkx makefile)
 #                 (基于环境变量通信, 优于命令行方式通信)
 #                 支持捕捉依赖生成异常,避免生成垃圾(sed***)临时文件
+#     2016/03/18: 支持通过环境变量与make通信生成mkx makefile
+#                 (废弃基于sed的变量替换文件生成机制、废弃MKX_PWD环境变量)
 #
 ###########################################################################
 
@@ -178,17 +180,18 @@ if [ -z "$cmdline_targets" ] ; then
     cmdline_targets="$makefile_targets"
 fi
 
+# export env for user-defined command & make (gen mkx makefile)
+export MKX_OPTIONS="$cmdline_options" \
+       MKX_TARGETS="$cmdline_targets" \
+       MKX_ORIGIN_MAKEDIR="$makedir" \
+       MKX_ORIGIN_MAKEFILE="$makefile"
+
 # pre make
 cmd="`mkm get config pre-make`"
 mklog debug "pre-make:[$cmd]"
 if [ -n "$cmd" ] ; then
     pwd="`pwd`"
-    eval "MKX_PWD='$pwd'; \
-          MKX_OPTIONS='$cmdline_options'; \
-          MKX_TARGETS='$cmdline_targets'; \
-          MKX_ORIGIN_MAKEDIR='$makedir'; \
-          MKX_ORIGIN_MAKEFILE='$makefile'; \
-          $cmd"
+    eval "$cmd"
     if [ $? -ne 0 ] ; then
         mklog error "run pre-make fail, cmd:[$cmd]"
     fi
@@ -227,7 +230,6 @@ if [   "$using_mkx_makefile_config"  = "yes" \
             fail_exit
         fi
         cp -f "$makefile_tpl_path" $makefile_mkx
-        sed -i "s/{_origin_makefile_}/$makefile_org/g" $makefile_mkx
     fi
     mklog debug "makefile-dep:[$makefile_dep]"
 
@@ -260,6 +262,9 @@ if [   "$using_mkx_makefile_config"  = "yes" \
     echo
 fi
 
+# export env for user-defined command & make (gen mkx makefile)
+export MKX_REAL_MAKEFILE="$makefile"
+
 # make flags
 makeflags="`mkm get config make-flags`"
 if [ "$using_makeflags_cmdline" = "no" ] ; then
@@ -282,12 +287,7 @@ cmd="`mkm get config post-make`"
 mklog debug "post-make:[$cmd]"
 if [ -n "$cmd" ] ; then
     pwd="`pwd`"
-    eval "MKX_PWD='$pwd'; \
-          MKX_OPTIONS='$cmdline_options'; \
-          MKX_TARGETS='$cmdline_targets'; \
-          MKX_ORIGIN_MAKEDIR='$makedir'; \
-          MKX_REAL_MAKEFILE='$makefile'; \
-          $cmd"
+    eval "$cmd"
     if [ $? -ne 0 ] ; then
         mklog error "run post-make fail, cmd:[$cmd]"
     fi
