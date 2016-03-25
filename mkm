@@ -68,6 +68,7 @@
 #                 支持命令模板(可配置不同模块的不同命令模板)
 #     2015/12/16: 支持模式匹配target(TODO: 支持del targetreg)
 #     2016/02/16: get config支持默认配置
+#     2016/03/25: 修复无法正常初始化项目级targetregs配置问题
 #
 ############################################################
 
@@ -182,6 +183,7 @@ if [ "$cmd" = "init" ] ; then
     touch "$mod/`basename $mkxrc_configs_prj`"
     touch "$mod/`basename $mkxrc_commands_prj`"
     touch "$mod/`basename $mkxrc_commandtpls_prj`"
+    touch "$mod/`basename $mkxrc_targetregs_prj`"
     echo "init project in $mod/ succ"
 fi
 

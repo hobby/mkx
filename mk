@@ -54,6 +54,7 @@
 #                 支持捕捉依赖生成异常,避免生成垃圾(sed***)临时文件
 #     2016/03/18: 支持通过环境变量与make通信生成mkx makefile
 #                 (废弃基于sed的变量替换文件生成机制、废弃MKX_PWD环境变量)
+#     2016/03/25: 支持makefile-tpl-path配置引用shell变量(例如$HOME)
 #
 ###########################################################################
 
@@ -220,6 +221,7 @@ if [   "$using_mkx_makefile_config"  = "yes" \
 
         # gen new mkx makefile from tpl
         makefile_tpl_path="`mkm get config makefile-tpl-path`"
+        makefile_tpl_path="`eval echo $makefile_tpl_path`"
         mklog debug "makefile tpl path:[$makefile_tpl_path]"
         if [ -z "$makefile_tpl_path" ] ; then
             mklog error "makefile tpl path not found, config:[makefile_tpl_path]"
@@ -245,7 +247,7 @@ if [   "$using_mkx_makefile_config"  = "yes" \
             echo -e "\n$dep"
             mklog debug "gen deps fail, depcmd:[$depcmd]"
             exit 1
-        fi                                      
+        fi
         dep="`echo -n "$dep" | tr -d '\\\\\n'`"
         mklog debug "depcmd:[$depcmd], dep:[$dep]"
 

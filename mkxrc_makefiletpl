@@ -2,7 +2,7 @@
 # vim:ts=4:sw=4:noexpandtab
 
 # include origin makefile's config
-include {_origin_makefile_}
+include ${MKX_ORIGIN_MAKEFILE}
 
 # new rule in mkx makefile
 %.o:%.c
