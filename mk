@@ -55,6 +55,8 @@
 #     2016/03/18: 支持通过环境变量与make通信生成mkx makefile
 #                 (废弃基于sed的变量替换文件生成机制、废弃MKX_PWD环境变量)
 #     2016/03/25: 支持makefile-tpl-path配置引用shell变量(例如$HOME)
+#     2016/04/13: 支持精确识别编译命令，避免无法正常生成依赖问题
+#                 (含有-c开关选项，而不是只含有-c关键字的命令才是编译命令)
 #
 ###########################################################################
 
@@ -238,7 +240,7 @@ if [   "$using_mkx_makefile_config"  = "yes" \
     # update targets's deps into mkx makefile
     mklog tip "generate deps for"
     make -f $makefile_dep $cmdline_options $cmdline_targets -n 2>/dev/null \
-    | grep -P "(^g++|^gcc).*-c.*$" \
+    | grep -P "(^g++|^gcc).*[ \t]-c[ \t].*$" \
     | while read mkcmd; do
         # get deps with -MM (user defined dep)
         depcmd="`echo -n "$mkcmd" | sed -e 's/-o[ \t]*[^ \t]*//g' -e 's/$/ -MM/g'`"
