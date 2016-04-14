@@ -225,16 +225,16 @@ do
     # or use user-defined module-name/deploy-path in cmdline
     modulename="$cmdline_modulename";
     deploypath="$cmdline_deploypath";
-    if [ "$modulename" = "" -o "$deploypath" = "" ] ; then
+    if [ -z "$modulename" -o -z "$deploypath" ] ; then
         # find modulename or deploypath by target
         eval `mkm find target $target \
               | awk '{printf "modulename=%s; deploypath=%s;" \
                              ,           $1,            $2}'`
-        if [ -z "$modulename" ] ; then
+        if [ -z "$modulename" -o -z "$deploypath" ] ; then
             eval `mkm find targetreg $target \
                  | awk '{printf "modulename=%s; deploypath=%s;" \
                                 ,           $1,            $2}'`
-            if [ -z "$modulename" ] ; then
+            if [ -z "$modulename" -o -z "$deploypath" ] ; then
                 mklog error "module not found, target:[$target]"
                 continue
             fi
@@ -242,12 +242,12 @@ do
         fi 
 
         # use user-defined module name (from cmdline)
-        if [ "$cmdline_modulename" != "" ] ; then
+        if [ -n "$cmdline_modulename" ] ; then
             modulename="$cmdline_modulename"
         fi
 
         # use user-defined deploy path (from cmdline)
-        if [ "$cmdline_deploypath" != "" ] ; then
+        if [ -n "$cmdline_deploypath" ] ; then
             deploypath="$cmdline_deploypath"
         fi
     fi
