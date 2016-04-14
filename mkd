@@ -18,6 +18,9 @@
 #       -j [N]        Allow N jobs at once; infinite jobs with no arg.
 #       -l [N]        Don't start multiple jobs unless load is below N.
 #
+#       -m MODULENAME Use MODULENAME as module-name for each target.
+#       -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target.
+#
 #       -x            Don't use mkx makefile.
 #       -z            Don't use make-flags config.
 #
@@ -28,6 +31,7 @@
 #     mkxrc_targets
 #     mkxrc_modules
 #     mkxrc_configs
+#     mkxrc_targetregs
 #
 # VERSION
 #     2015/11/21: 支持命令行或者makefile中OUTPUT定义的target
@@ -54,6 +58,8 @@
 #     2016/02/17: 支持自定义选项(make选项集的子集 + mkx扩展)
 #                 支持-x临时不使用mkx makefile(透传mk)
 #                 支持-z临时不使用make-flags配置(透传mk)
+#     2016/04/14: 支持命令行指定module-name(-m)、deploy-path(-d)
+#                 (方便临时切换部署环境)
 #
 ############################################################
 
@@ -70,6 +76,9 @@ function help()
     echo "  -h            Print this message and exit."
     echo "  -l [N]        Don't start multiple jobs unless load is below N."
     echo ""
+    echo "  -m MODULENAME Use MODULENAME as module-name for each target."
+    echo "  -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target."
+    echo ""
     echo "  -x            Don't use mkx makefile."
     echo "  -z            Don't use make-flags config."
     echo ""
@@ -83,11 +92,13 @@ cmdline_options=""
 cmdline_options_x=""
 cmdline_options_z=""
 cmdline_targets=""
+cmdline_modulename=""
+cmdline_deploypath=""
 
 # parse cmdline
 cmdline="$@"
 mklog debug "origin-args:[$@]"
-temp=$(getopt -o "C:f:hj::l::xz" --long "" -n "mkd" -- "$@")
+temp=$(getopt -o "C:f:hj::l::m:d:xz" --long "" -n "mkd" -- "$@")
 if [ $? != 0 ] ; then
     echo "`help`" >&2
     exit 1
@@ -102,6 +113,8 @@ do
         -h) echo "`help`" >&2; exit 0;;
         -j) cmdline_options="$cmdline_options -j$2"; shift 2;;
         -l) cmdline_options="$cmdline_options -l$2"; shift 2;;
+        -m) cmdline_modulename="$2"; shift 2;;
+        -d) cmdline_deploypath="$2"; shift 2;;
         -x) cmdline_options_x="-x"; shift 1;;
         -z) cmdline_options_z="-z"; shift 1;;
         --) shift ; break ;;
@@ -111,7 +124,8 @@ done
 cmdline_targets="$@"
 mklog debug "cmdline_makedir:[$cmdline_makedir], cmdline_makefile:[$cmdline_makefile]," \
             "cmdline_options:[$cmdline_options], cmdline_targets:[$cmdline_targets]," \
-            "cmdline_options_x:[$cmdline_options_x], cmdline_options_z:[$cmdline_options_z]"
+            "cmdline_options_x:[$cmdline_options_x], cmdline_options_z:[$cmdline_options_z]" \
+            "cmdline_modulename:[$cmdline_modulename], cmdline_deploypath:[$cmdline_deploypath]"
 
 # (using $makefile to make and) deploy $targets from $makedir
 targets="$cmdline_targets"
@@ -208,30 +222,45 @@ do
     fi
 
     # find target's module
-    module=""; hostpath="";
-    eval `mkm find target $target \
-          | awk '{printf "module=%s; hostpath=%s;" \
-                         ,       $1,          $2}'`
-    if [ -z "$module" ] ; then
-        eval `mkm find targetreg $target \
-             | awk '{printf "module=%s; hostpath=%s;" \
-                            ,       $1,          $2}'`
-        if [ -z "$module" ] ; then
-            mklog error "module not found, target:[$target]"
-            continue
+    # or use user-defined module-name/deploy-path in cmdline
+    modulename="$cmdline_modulename";
+    deploypath="$cmdline_deploypath";
+    if [ "$modulename" = "" -o "$deploypath" = "" ] ; then
+        # find modulename or deploypath by target
+        eval `mkm find target $target \
+              | awk '{printf "modulename=%s; deploypath=%s;" \
+                             ,           $1,            $2}'`
+        if [ -z "$modulename" ] ; then
+            eval `mkm find targetreg $target \
+                 | awk '{printf "modulename=%s; deploypath=%s;" \
+                                ,           $1,            $2}'`
+            if [ -z "$modulename" ] ; then
+                mklog error "module not found, target:[$target]"
+                continue
+            fi
+            mklog debug "module found in targetreg, target:[$target]"
+        fi 
+
+        # use user-defined module name (from cmdline)
+        if [ "$cmdline_modulename" != "" ] ; then
+            modulename="$cmdline_modulename"
         fi
-        mklog debug "module found in targetreg, target:[$target]"
-    fi 
+
+        # use user-defined deploy path (from cmdline)
+        if [ "$cmdline_deploypath" != "" ] ; then
+            deploypath="$cmdline_deploypath"
+        fi
+    fi
 
     # find module's info
     mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
-    eval `mkm find module $module \
+    eval `mkm find module $modulename \
           | awk '{printf "mtype=%s; username=%s; rsapkey=%s; hostname=%s; hostport=%s;" \
                          ,     $2,          $3,         $4,          $5,          $6}'`
-    mklog debug "target:[$target], module:[$module], mtype:[$mtype]," \
+    mklog debug "target:[$target], module:[$modulename], mtype:[$mtype]," \
                 "username:[$username], rsa-private:[$rsapkey]," \
                 "hostname:[$hostname], hostport:[$hostport]," \
-                "hostpath:[$hostpath], makedir:[$makedir]"
+                "deploypath:[$deploypath], makedir:[$makedir]"
     if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
                     "supported type:[rsa, local, passwd], target:[$target]"
@@ -243,24 +272,24 @@ do
     case "$mtype" in
         rsa)
             if [   -z "$username" -o -z "$rsapkey" \
-                -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
+                -o -z "$hostname" -o -z "$hostport" -o -z "$deploypath" ]
             then
-                mklog error "rsa module not ok, target:[$target], module:[$module]"
+                mklog error "rsa module not ok, target:[$target], module:[$modulename]"
                 continue
             fi
-            scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$hostpath
+            scp -C -i $rsapkey -P $hostport "$makedir/$target" $username@$hostname:$deploypath/
             ;;
         local)
-            cp -v "$makedir/$target" $hostpath
+            cp -v "$makedir/$target" $deploypath/
             ;;
         passwd)
             if [   -z "$username" -o -z "$rsapkey" \
-                -o -z "$hostname" -o -z "$hostport" -o -z "$hostpath" ]
+                -o -z "$hostname" -o -z "$hostport" -o -z "$deploypath" ]
             then
-                mklog error "passwd module not ok, target:[$target], module:[$module]"
+                mklog error "passwd module not ok, target:[$target], module:[$modulename]"
                 continue
             fi
-            mkscpto "$makedir/$target" $username $rsapkey $hostname $hostport $hostpath
+            mkscpto "$makedir/$target" $username $rsapkey $hostname $hostport $deploypath/
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \
