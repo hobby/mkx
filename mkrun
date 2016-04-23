@@ -7,9 +7,15 @@
 #
 # SYNOPSIS
 #     mkrun
-#     mkrun command-type targets ...
+#     mkrun [ options ] command-type targets ...
 # 
 #     debug=on mkrun ...
+#
+# OPTIONS
+#       -h            Print this message and exit.
+#
+#       -m MODULENAME Use MODULENAME as module-name for each target.
+#       -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target.
 #
 # AUTHORS
 #     neiku project <ku7d@qq.com> 
@@ -18,6 +24,7 @@
 #     mkxrc_modules
 #     mkxrc_targets
 #     mkxrc_commands
+#     mkxrc_targetregs
 #     mkxrc_commandtpls
 #
 # VERSION
@@ -35,14 +42,57 @@
 #     2015/12/23: 支持模式匹配target
 #     2016/03/18: 支持通过环境变量与用户定义命令(模板)通信
 #                 (废弃基于sed的变量替换命令生成机制)
+#     2016/04/23: 支持命令行指定module-name(-m)、deploy-path(-d)
+#                 (方便临时切换部署环境)
+#                 MKX_MODULE   改名为 MKX_MODULENAME (模块名字)
+#                 MKX_HOSTPATH 改名为 MKX_DEPLOYPATH (部署路径)
 #
 ##################################################################
 
 # target(*) <-----> module(1)     <-----> destination(1)
 # target(1) <-----> command(*)
 
+# help
+function help()
+{
+    echo "Usage: mkrun [ options ] command-type targets ..."
+    echo "Options:"
+    echo "  -h            Print this message and exit."
+    echo ""
+    echo "  -m MODULENAME Use MODULENAME as module-name for each target."
+    echo "  -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target."
+    echo ""
+    echo "Report bugs to <ku7d@qq.com>"
+}
+
+# mkrun [ options ] command-type targets ...
+cmdline_modulename=""
+cmdline_deploypath=""
+
+# parse cmdline
+cmdline="$@"
+mklog debug "origin-args:[$@]"
+temp=$(getopt -o "hm:d:" --long "" -n "mkrun" -- "$@")
+if [ $? != 0 ] ; then
+    echo "`help`" >&2
+    exit 1
+fi
+eval set -- "$temp"
+mklog debug "parsed-args:[$temp]"
+while true
+do
+    case "$1" in
+        -h) echo "`help`" >&2; exit 0;;
+        -m) cmdline_modulename="$2"; shift 2;;
+        -d) cmdline_deploypath="$2"; shift 2;;
+        --) shift ; break ;;
+        *)  echo "parse options error!" >&2 ; exit 1 ;;
+    esac
+done
+mklog debug "cmdline_modulename:[$cmdline_modulename], cmdline_deploypath:[$cmdline_deploypath]"
+
 if [ $# -lt 2 ] ; then
-    mklog error "usage: $0 command-type targets ..."
+    echo "`help`" >&2;
     exit 1
 fi
 
@@ -67,21 +117,36 @@ do
     fi
 
     # find target's module
-    module=""; hostpath="";
-    eval `mkm find target $target \
-          | awk '{printf "module=%s; hostpath=%s;" \
-                         ,       $1,          $2}'`
-    if [ -z "$module" ] ; then
-        eval `mkm find targetreg $target \
-             | awk '{printf "module=%s; hostpath=%s;" \
-                            ,       $1,          $2}'`
-        if [ -z "$module" ] ; then
-            mklog error "module not found, target:[$target]"
-            continue
+    # or use user-defined module-name/deploy-path in cmdline
+    modulename="$cmdline_modulename";
+    deploypath="$cmdline_deploypath";
+    if [ -z "$modulename" -o -z "$deploypath" ] ; then
+        # find modulename or deploypath by target
+        eval `mkm find target $target \
+              | awk '{printf "modulename=%s; deploypath=%s;" \
+                             ,           $1,            $2}'`
+        if [ -z "$modulename" -o -z "$deploypath" ] ; then
+            eval `mkm find targetreg $target \
+                 | awk '{printf "modulename=%s; deploypath=%s;" \
+                                ,           $1,            $2}'`
+            if [ -z "$modulename" -o -z "$deploypath" ] ; then
+                mklog error "module not found, target:[$target]"
+                continue
+            fi
+            mklog debug "module found in targetreg, target:[$target]"
+        fi 
+
+        # use user-defined module name (from cmdline)
+        if [ -n "$cmdline_modulename" ] ; then
+            modulename="$cmdline_modulename"
         fi
-        mklog debug "module found in targetreg, target:[$target]"
+
+        # use user-defined deploy path (from cmdline)
+        if [ -n "$cmdline_deploypath" ] ; then
+            deploypath="$cmdline_deploypath"
+        fi
     fi
-    mklog debug "module:[$module], hostpath:[$hostpath], target:[$target]"
+    mklog debug "module:[$modulename], deploypath:[$deploypath], target:[$target]"
 
     # load target's command
     command=""
@@ -97,17 +162,17 @@ do
     if [ -z "$command" ] ; then
         # no command yet, try command tpl
         cmdtpl=""
-        eval `mkm find commandtpl $module $cmdtype | while read moduledump typedump commandtpl
+        eval `mkm find commandtpl $modulename $cmdtype | while read moduledump typedump commandtpl
               do
                   echo "cmdtpl='$commandtpl';"
               done` >/dev/null 2>&1
-        mklog debug "module:[$module], target:[$target], cmdtype:[$cmdtype], cmdtpl:[$cmdtpl]"
+        mklog debug "module:[$modulename], target:[$target], cmdtype:[$cmdtype], cmdtpl:[$cmdtpl]"
         if [ -z "$cmdtpl" ] ; then
             mklog error "'$cmdtype' command and default '$cmdtype' command tpl not found," \
-                        "module:[$module], target:[$target], cmdtype:[$cmdtype]"
+                        "module:[$modulename], target:[$target], cmdtype:[$cmdtype]"
             continue
         fi
-        mklog debug "module:[$module], target:[$target], command tpl:[$cmdtpl]"
+        mklog debug "module:[$modulename], target:[$target], command tpl:[$cmdtpl]"
 
         command="$cmdtpl"
     fi
@@ -121,14 +186,12 @@ do
 
     # load module's info
     mtype=""; username=""; rsapkey=""; hostname=""; hostport="";
-    eval `mkm find module $module \
+    eval `mkm find module $modulename \
           | awk '{printf "mtype=%s; username=%s; rsapkey=%s; hostname=%s; hostport=%s;" \
                          ,      $2,          $3,         $4,          $5,          $6}'`
-    if [ -n "$debug" ] ; then
-        mklog debug "target:[$target], module:[$module], mtype:[$mtype]," \
-                    "username:[$username], rsa-private:[$rsapkey]," \
-                    "hostname:[$hostname], hostport:[$hostport]"
-    fi
+    mklog debug "target:[$target], module:[$modulename], mtype:[$mtype]," \
+                "username:[$username], rsa-private:[$rsapkey]," \
+                "hostname:[$hostname], hostport:[$hostport]"
     if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
                     "supported type:[rsa, local, passwd]"
@@ -137,11 +200,11 @@ do
 
     # export env before running command
     exportcmd="export"
-    exportcmd="$exportcmd MKX_MODULE='$module'"
+    exportcmd="$exportcmd MKX_MODULENAME='$modulename'"
     exportcmd="$exportcmd MKX_TARGET='$target'"
     exportcmd="$exportcmd MKX_MTYPE='$mtype'"
     exportcmd="$exportcmd MKX_CMDTYPE='$cmdtype'"
-    exportcmd="$exportcmd MKX_HOSTPATH='$hostpath'"
+    exportcmd="$exportcmd MKX_DEPLOYPATH='$deploypath'"
 
     # run command
     mklog normal "run '$cmdtype' command for '$target' with command:[$command]"
@@ -150,7 +213,7 @@ do
             if [   -z "$username" -o -z "$rsapkey"  \
                 -o -z "$hostname" -o -z "$hostport" ]
             then
-                mklog error "rsa module not ok, target:[$target], module:[$module]"
+                mklog error "rsa module not ok, target:[$target], module:[$modulename]"
                 continue
             fi
             ssh -i $rsapkey -p $hostport $username@$hostname "$exportcmd; $command"
@@ -162,7 +225,7 @@ do
             if [   -z "$username" -o -z "$rsapkey"  \
                 -o -z "$hostname" -o -z "$hostport" ]
             then
-                mklog error "passwd module not ok, target:[$target], module:[$module]"
+                mklog error "passwd module not ok, target:[$target], module:[$modulename]"
                 exit 1
             fi
             mkssh $username $rsapkey $hostname $hostport "$exportcmd; $command"
