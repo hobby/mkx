@@ -46,6 +46,7 @@
 #                 (方便临时切换部署环境)
 #                 MKX_MODULE   改名为 MKX_MODULENAME (模块名字)
 #                 MKX_HOSTPATH 改名为 MKX_DEPLOYPATH (部署路径)
+#     2016/05/01: 支持透传-m/-d选项给mkrun(处理alias命令)
 #
 ##################################################################
 
@@ -180,7 +181,7 @@ do
     # maybe command alias
     if [ "${command:0:1}" = "@" ] ; then
         mklog debug "$target's '$cmdtype' command is alias '${command:1}' command"
-        mkrun "${command:1}" $target
+        mkrun -m"$modulename" -d"$deploypath" "${command:1}" $target
         continue
     fi
 

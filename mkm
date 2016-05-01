@@ -307,7 +307,7 @@ if [ $mod = "module" ] ; then
             exit
         fi
         [ $# -lt 2 ] && showhelp && exit 1
-        [ "$2" != "rsa" -a "$2" != "local" -a "$2" != "passwd" ] && showhelp && exit 1
+        [ "$2" != "rsa" -a "$2" != "local" -a "$2" != "passwd" -a "$2" != "custom" ] && showhelp && exit 1
         [ "$2" = "rsa" -a $# -lt 6 ] && showhelp && exit 1
         [ "$2" = "passwd" -a $# -lt 6 ] && showhelp && exit 1
         echo "$*" >> "$path" \

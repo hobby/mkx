@@ -7,9 +7,17 @@
 #
 # SYNOPSIS
 #     mks
-#     mks [ -f makefile ] [ targets ] ...
+#     mks [ options ] [ targets ] ...
 # 
 #     debug=on mks ...
+#
+# OPTIONS
+#       -C DIRECTORY  Change to DIRECTORY before doing anything.
+#       -f FILE       Read FILE as a makefile.
+#       -h            Print this message and exit.
+#
+#       -m MODULENAME Use MODULENAME as module-name for each target.
+#       -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target.
 #
 # AUTHORS
 #     neiku project <ku7d@qq.com> 
@@ -25,64 +33,140 @@
 #     2015/12/03: 支持目录递归查找target
 #     2016/02/16: 支持自定义默认target变量名(key => output-name)
 #                 (默认使用OUTPUT做为默认target变量名)
+#     2016/05/01: 支持自定义命令行
+#                 支持透传-m/-d选项给mkrun
 #
 ############################################################
 
-# i need mkrun
-if ! which mkrun >/dev/null 2>&1
-then
-    mklog error "mkrun not found"
+# help
+function help()
+{
+    echo "Usage: mk [ options ] [ targets ] ..."
+    echo "Options:"
+    echo "  -C DIRECTORY  Change to DIRECTORY before doing anything."
+    echo "  -f FILE       Read FILE as a makefile."
+    echo "  -h            Print this message and exit."
+    echo ""
+    echo "  -m MODULENAME Use MODULENAME as module-name for each target."
+    echo "  -d DEPLOYPATH Use DEPLOYPATH as deploy-path for each target."
+    echo ""
+    echo "Report bugs to <ku7d@qq.com>"
+}
+
+# mks -C {makedir} -f {makefile} -m {MODULENAME} -d {DEPLOYPATH} {cmdline_targets}
+progname="mks"
+makedir=""
+makefile=""
+cmdline_options_m=""
+cmdline_options_d=""
+cmdline_targets=""
+cmdline_forwards=""
+
+# parse cmdline
+mklog debug "origin-args:[$@]"
+temp=$(getopt -o "C:f:hm:d:" --long "" -n "$progname" -- "$@")
+if [ $? != 0 ] ; then
+    echo "`help`" >&2
     exit 1
+fi
+eval set -- "$temp"
+mklog debug "parsed-args:[$temp]"
+while true
+do
+    case "$1" in
+        -C) makedir="$2" ;  shift 2 ;;
+        -f) makefile="$2" ; shift 2 ;;
+        -h) echo "`help`" >&2; exit 0;;
+        -m) cmdline_options_m="$2" ; shift 2 ;;
+        -d) cmdline_options_d="$2" ; shift 2 ;;
+        --) shift ; break ;;
+        *)  echo "parse options error!" >&2 ; exit 1 ;;
+    esac
+done
+cmdline_targets="$@"
+mklog debug "makedir:[$makedir], makefile:[$makefile]," \
+            "cmdline_targets:[$cmdline_targets]," \
+            "cmdline_options_m:[$cmdline_options_m], cmdline_options_d:[$cmdline_options_d]"
+
+# cmdline forwards
+if [ -n "$cmdline_options_m" ] ; then
+    cmdline_forwards="$cmdline_forwards -m$cmdline_options_m"
+fi
+if [ -n "$cmdline_options_d" ] ; then
+    cmdline_forwards="$cmdline_forwards -d$cmdline_options_d"
 fi
 
-# get make directory
-makedir="`make $* -n -p 2>/dev/null | grep '^CURDIR :=' | tail -n1 | cut -c11-`"
-if [ -z "$makedir" ] ; then
-    mklog error "make directory not found, make args:[$*]"
-    exit 1
+# wrapper
+succ_exit() { [ -n "$makedir" ] && echo "$progname: Leaving directory '$makedir'"; exit 0; }
+fail_exit() { [ -n "$makedir" ] && echo "$progname: Leaving directory '$makedir'"; exit 1; }
+
+# go into make directory if need
+if [ -n "$makedir" ] ; then
+    if [ ! -d "$makedir" ] ; then
+        mklog error "check directory fail, directory:[$makedir]"
+        exit 1
+    fi
+
+    echo "$progname: Entering directory '$makedir'"
+    cd "$makedir" || fail_exit
 fi
-mklog debug "makedir=$makedir"
+
+# get makefile from cmdline(by user) or make(auto load)
+if [ -z "$makefile" ] ; then
+    makefile="`make $cmdline_targets -n -p 2>/dev/null \
+              | grep '^MAKEFILE_LIST' \
+              | head -n1 \
+              | awk '{printf $3}'`"
+    if [ -z "$makefile" ] ; then
+        mklog error "makefile not found, make args:[$cmdline_targets]"
+        fail_exit
+    fi
+fi
+if [ ! -f "$makefile" ] ; then
+    mklog error "check makefile fail, makefile:[$makefile]"
+    fail_exit
+fi
+mklog debug "makefile:[$makefile]"
+
+# get make's internal database
+makedata="`make -f $makefile $cmdline_targets -n -p 2>/dev/null`"
 
 # maybe mks for sub directorys
-submakedirs="`make $* -n -p 2>/dev/null | grep '^DIRS =' | tail -n1 | cut -c8-`"
+submakedirs="`echo "$makedata" | grep '^DIRS =' | tail -n1 | cut -c8-`"
 mklog debug "submakedirs=$submakedirs"
 if [ -n "$submakedirs" ] ; then
     for subdir in $submakedirs
     do
-        mksdir=""
         if [ "${subdir:0:1}" = "/" ] ; then
-            mksdir="$subdir"
+            mks -C $subdir $cmdline_forwards
         else
-            mksdir="$makedir/$subdir"
+            mks -C `pwd`/$subdir $cmdline_forwards
         fi
-
-        pwd="`pwd`"
-        echo "mks: Entering directory '$mksdir'"
-        cd "$mksdir"
-        mks
-        echo "mks: Leaving directory '$mksdir'"
-        cd "$pwd"
     done
-    mklog debug "mks for directorys end"
-    exit 0
+    mklog debug "$progname for directorys end"
+    succ_exit
 fi
 
-# get targets from cmdline
-targets="`make $* -n -p 2>/dev/null | grep '^MAKECMDGOALS :=' | cut -c17-`"
-if [ -z "$targets" ]
-then
+# get targets makefile if need
+if [ -z "$cmdline_targets" ] ; then
     # default targets from $output var in makefile
     output="`mkm get config output-name OUTPUT`"
     length="$((${#output} + 4))"
-    targets="`make $* -n -p 2>/dev/null | grep "^$output =" | cut -c$length-`"
-    if [ -z "$targets" ]
-    then
-        mklog error "targets not found, make args:[$*]," \
+    makefile_targets="`echo "$makedata" | grep "^$output =" | cut -c$length-`"
+    if [ -z "$makefile_targets" ] ; then
+        mklog error "targets not found, make args:[$cmdline_options]," \
                     "output-name:[$output], length:[$length]"
-        exit 1
+        fail_exit
     fi
+    cmdline_targets="$makefile_targets"
 fi
-mklog debug "targets:[$targets]"
 
 # run target's start command
-mkrun start $targets
+mkrun start $cmdline_targets $cmdline_forwards
+if [ $? -ne 0 ] ; then
+    mklog error "mkrun start fail, target:[$cmdline_targets], forwards:[$cmdline_forwards]"
+    fail_exit
+fi
+
+# all done
+succ_exit

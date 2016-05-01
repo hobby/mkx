@@ -60,6 +60,7 @@
 #                 支持-z临时不使用make-flags配置(透传mk)
 #     2016/04/14: 支持命令行指定module-name(-m)、deploy-path(-d)
 #                 (方便临时切换部署环境)
+#     2016/05/01: 支持透传-m/-d选项给mkrun
 #
 ############################################################
 
@@ -94,6 +95,7 @@ cmdline_options_z=""
 cmdline_targets=""
 cmdline_modulename=""
 cmdline_deploypath=""
+cmdline_forwards=""
 
 # parse cmdline
 cmdline="$@"
@@ -124,8 +126,17 @@ done
 cmdline_targets="$@"
 mklog debug "cmdline_makedir:[$cmdline_makedir], cmdline_makefile:[$cmdline_makefile]," \
             "cmdline_options:[$cmdline_options], cmdline_targets:[$cmdline_targets]," \
-            "cmdline_options_x:[$cmdline_options_x], cmdline_options_z:[$cmdline_options_z]" \
+            "cmdline_options_x:[$cmdline_options_x], cmdline_options_z:[$cmdline_options_z]," \
             "cmdline_modulename:[$cmdline_modulename], cmdline_deploypath:[$cmdline_deploypath]"
+
+# cmdline forwards
+if [ -n "$cmdline_modulename" ] ; then
+    cmdline_forwards="$cmdline_forwards -m$cmdline_modulename"
+fi
+if [ -n "$cmdline_deploypath" ] ; then
+    cmdline_forwards="$cmdline_forwards -d$cmdline_deploypath"
+fi
+mklog debug "cmdline_forwards:[$cmdline_forwards]"
 
 # (using $makefile to make and) deploy $targets from $makedir
 targets="$cmdline_targets"
@@ -268,7 +279,7 @@ do
     fi
 
     # do deploy
-    mkrun pre-deploy $target 2>/dev/null
+    mkrun $cmdline_forwards pre-deploy $target 2>/dev/null
     case "$mtype" in
         rsa)
             if [   -z "$username" -o -z "$rsapkey" \
@@ -297,7 +308,7 @@ do
             continue
             ;;
     esac
-    mkrun post-deploy $target 2>/dev/null
+    mkrun $cmdline_forwards post-deploy $target 2>/dev/null
 done
 
 # all done
