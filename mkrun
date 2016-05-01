@@ -47,6 +47,8 @@
 #                 MKX_MODULE   改名为 MKX_MODULENAME (模块名字)
 #                 MKX_HOSTPATH 改名为 MKX_DEPLOYPATH (部署路径)
 #     2016/05/01: 支持透传-m/-d选项给mkrun(处理alias命令)
+#                 支持自定义module(module type = custom)
+#                 (custom-runner 配置自定义命令执行工具)
 #
 ##################################################################
 
@@ -193,9 +195,12 @@ do
     mklog debug "target:[$target], module:[$modulename], mtype:[$mtype]," \
                 "username:[$username], rsa-private:[$rsapkey]," \
                 "hostname:[$hostname], hostport:[$hostport]"
-    if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
+    if [   "$mtype" != "rsa"    \
+        -a "$mtype" != "local"  \
+        -a "$mtype" != "passwd" \
+        -a "$mtype" != "custom" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
-                    "supported type:[rsa, local, passwd]"
+                    "supported type:[rsa, local, passwd, custom], target:[$target]"
         continue
     fi
 
@@ -230,6 +235,38 @@ do
                 exit 1
             fi
             mkssh $username $rsapkey $hostname $hostport "$exportcmd; $command"
+            ;;
+        custom)
+            # custom runner
+            customrunner="`mkm get config custom-runner`"
+            if [ -z "$customrunner" ] ; then
+                mklog error "custom runner not found, target:[$target], module:[$modulename]"
+                continue
+            fi
+            mklog debug "custom-runner:[$customrunner]"
+
+            # run runner
+            export MKX_CUSTOM_TARGETPATH="$makedir/$target" \
+                   MKX_CUSTOM_TARGETNAME="$target"          \
+                   MKX_CUSTOM_DEPLOYPATH="$deploypath/"     \
+                   MKX_CUSTOM_CONFIG1="$modulename"         \
+                   MKX_CUSTOM_CONFIG2="$mtype"              \
+                   MKX_CUSTOM_CONFIG3="$username"           \
+                   MKX_CUSTOM_CONFIG4="$rsapkey"            \
+                   MKX_CUSTOM_CONFIG5="$hostname"           \
+                   MKX_CUSTOM_CONFIG6="$hostport"           \
+                   MKX_CUSTOM_COMMAND="$exportcmd; $command"
+            eval "$customrunner"
+            unset  MKX_CUSTOM_TARGETPATH \
+                   MKX_CUSTOM_TARGETNAME \
+                   MKX_CUSTOM_DEPLOYPATH \
+                   MKX_CUSTOM_CONFIG1    \
+                   MKX_CUSTOM_CONFIG2    \
+                   MKX_CUSTOM_CONFIG3    \
+                   MKX_CUSTOM_CONFIG4    \
+                   MKX_CUSTOM_CONFIG5    \
+                   MKX_CUSTOM_CONFIG6    \
+                   MKX_CUSTOM_COMMAND
             ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \

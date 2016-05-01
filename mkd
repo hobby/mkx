@@ -61,6 +61,8 @@
 #     2016/04/14: 支持命令行指定module-name(-m)、deploy-path(-d)
 #                 (方便临时切换部署环境)
 #     2016/05/01: 支持透传-m/-d选项给mkrun
+#                 支持自定义module(module type = custom)
+#                 (custom-deployer 配置自定义部署工具)
 #
 ############################################################
 
@@ -272,9 +274,12 @@ do
                 "username:[$username], rsa-private:[$rsapkey]," \
                 "hostname:[$hostname], hostport:[$hostport]," \
                 "deploypath:[$deploypath], makedir:[$makedir]"
-    if [ "$mtype" != "rsa" -a "$mtype" != "local" -a "$mtype" != "passwd" ] ; then
+    if [   "$mtype" != "rsa"    \
+        -a "$mtype" != "local"  \
+        -a "$mtype" != "passwd" \
+        -a "$mtype" != "custom" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
-                    "supported type:[rsa, local, passwd], target:[$target]"
+                    "supported type:[rsa, local, passwd, custom], target:[$target]"
         continue
     fi
 
@@ -302,9 +307,39 @@ do
             fi
             mkscpto "$makedir/$target" $username $rsapkey $hostname $hostport $deploypath/
             ;;
+        custom)
+            # custom deployer
+            customdeployer="`mkm get config custom-deployer`"
+            if [ -z "$customdeployer" ] ; then
+                mklog error "custom deployer not found, target:[$target], module:[$modulename]"
+                continue
+            fi
+            mklog debug "custom-deployer:[$customdeployer]"
+
+            # run deployer
+            export MKX_CUSTOM_TARGETPATH="$makedir/$target" \
+                   MKX_CUSTOM_TARGETNAME="$target"          \
+                   MKX_CUSTOM_DEPLOYPATH="$deploypath/"     \
+                   MKX_CUSTOM_CONFIG1="$modulename"         \
+                   MKX_CUSTOM_CONFIG2="$mtype"              \
+                   MKX_CUSTOM_CONFIG3="$username"           \
+                   MKX_CUSTOM_CONFIG4="$rsapkey"            \
+                   MKX_CUSTOM_CONFIG5="$hostname"           \
+                   MKX_CUSTOM_CONFIG6="$hostport"
+            eval "$customdeployer"
+            unset  MKX_CUSTOM_TARGETPATH \
+                   MKX_CUSTOM_TARGETNAME \
+                   MKX_CUSTOM_DEPLOYPATH \
+                   MKX_CUSTOM_CONFIG1    \
+                   MKX_CUSTOM_CONFIG2    \
+                   MKX_CUSTOM_CONFIG3    \
+                   MKX_CUSTOM_CONFIG4    \
+                   MKX_CUSTOM_CONFIG5    \
+                   MKX_CUSTOM_CONFIG6    
+            ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \
-                        "supported type:[rsa, local, passwd]"
+                        "supported type:[rsa, local, passwd, custom]"
             continue
             ;;
     esac

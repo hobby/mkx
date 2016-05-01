@@ -8,3 +8,9 @@ post-make = echo this is post-make code
 
 # make-flags: make flags (for mk)
 make-flags = "-j`cat /proc/cpuinfo | grep processor | wc -l`"
+
+# custom-deployer: custom module's deployer (for mkd)
+custom-deployer:
+
+# custom-runner: custom module's runner (for mkrun)
+custom-runner:
