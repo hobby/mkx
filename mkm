@@ -69,6 +69,9 @@
 #     2015/12/16: 支持模式匹配target(TODO: 支持del targetreg)
 #     2016/02/16: get config支持默认配置
 #     2016/03/25: 修复无法正常初始化项目级targetregs配置问题
+#     2016/05/28: 支持使用反斜杠作为多行配置的续行符
+#                 ( \\\\ 在两个反引号之间等价于 \\ )
+#                 ( targetreg 不支持多行配置 )
 #
 ############################################################
 
@@ -194,12 +197,20 @@ if [ $mod = "target" ] ; then
         path="`mkm path target $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            grep -v -E "^#|^$" "$path" 2>/dev/null \
+            grep -v -E "^#" "$path" 2>/dev/null \
+            | sed 's/^[ \t]*//g' \
+            | sed ':begin; N; s/\\[ \t]*\n/ /g; b begin;' \
+            | sed 's/\\[ \t]*$//g' \
+            | grep -v "^$" \
             | grep -w "$2" \
             | tail -n1
             exit
         fi
-        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+        out="`grep -v -E "^#" "$path" 2>/dev/null \
+              | sed 's/^[ \t]*//g' \
+              | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+              | sed 's/\\\\[ \t]*$//g' \
+              | grep -v "^$" \
               | grep -w "$1" \
               | tail -n1`"
         [ -z "$out" ] && out="`mkm find target --global $1`"
@@ -279,12 +290,20 @@ if [ $mod = "module" ] ; then
         path="`mkm path module $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            grep -v -E "^#|^$" "$path" 2>/dev/null \
+            grep -v -E "^#" "$path" 2>/dev/null \
+            | sed 's/^[ \t]*//g' \
+            | sed ':begin; N; s/\\[ \t]*\n/ /g; b begin;' \
+            | sed 's/\\[ \t]*$//g' \
+            | grep -v "^$" \
             | grep -w "^$2" \
             | tail -n1
             exit
         fi
-        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+        out="`grep -v -E "^#" "$path" 2>/dev/null \
+              | sed 's/^[ \t]*//g' \
+              | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+              | sed 's/\\\\[ \t]*$//g' \
+              | grep -v "^$" \
               | grep -w "^$1" \
               | tail -n1`"
         [ -z "$out" ] && out="`mkm find module --global $1`"
@@ -388,12 +407,20 @@ if [ $mod = "config" ] ; then
         path="`mkm path config $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            grep -v -E "^#|^$" "$path" 2>/dev/null \
+            grep -v -E "^#" "$path" 2>/dev/null \
+            | sed 's/^[ \t]*//g' \
+            | sed ':begin; N; s/\\[ \t]*\n/ /g; b begin;' \
+            | sed 's/\\[ \t]*$//g' \
+            | grep -v "^$" \
             | grep -P "^[ \t]*$2[ \t]*=" \
             | tail -n1
             exit
         fi
-        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+        out="`grep -v -E "^#" "$path" 2>/dev/null \
+              | sed 's/^[ \t]*//g' \
+              | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+              | sed 's/\\\\[ \t]*$//g' \
+              | grep -v "^$" \
               | grep -P "^[ \t]*$1[ \t]*=" \
               | tail -n1`"
         [ -z "$out" ] && out="`mkm find config --global $1`"
@@ -474,13 +501,21 @@ if [ $mod = "command" ] ; then
         path="`mkm path command $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+            out="`grep -v -E "^#" "$path" 2>/dev/null \
+                  | sed 's/^[ \t]*//g' \
+                  | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+                  | sed 's/\\\\[ \t]*$//g' \
+                  | grep -v "^$" \
                   | grep -w -P "^$2[ \t]*"`"
             [ -z "$out" ] && exit
             [ -z "$3" ] && echo "$out" && exit
             echo "$out" | grep -P "^$2[ \t]*$3" | tail -n1 && exit
         fi
-        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+        out="`grep -v -E "^#" "$path" 2>/dev/null \
+              | sed 's/^[ \t]*//g' \
+              | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+              | sed 's/\\\\[ \t]*$//g' \
+              | grep -v "^$" \
               | grep -w -P "^$1[ \t]*"`"
         [ -n "$out" -a -z "$2" ] \
         && mkm find command --system $1 \
@@ -565,13 +600,21 @@ if [ $mod = "commandtpl" ] ; then
         path="`mkm path commandtpl $1`"
         if [ "$1" = "--global" -o "$1" = "--system" ] ; then
             [ -z "$2" ] && showhelp && exit 1
-            out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+            out="`grep -v -E "^#" "$path" 2>/dev/null \
+                  | sed 's/^[ \t]*//g' \
+                  | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+                  | sed 's/\\\\[ \t]*$//g' \
+                  | grep -v "^$" \
                   | grep -w -P "^$2[ \t]*"`"
             [ -z "$out" ] && exit
             [ -z "$3" ] && echo "$out" && exit
             echo "$out" | grep -P "^$2[ \t]*$3" | tail -n1 && exit
         fi
-        out="`grep -v -E "^#|^$" "$path" 2>/dev/null \
+        out="`grep -v -E "^#" "$path" 2>/dev/null \
+              | sed 's/^[ \t]*//g' \
+              | sed ':begin; N; s/\\\\[ \t]*\n/ /g; b begin;' \
+              | sed 's/\\\\[ \t]*$//g' \
+              | grep -v "^$" \
               | grep -w -P "^$1[ \t]*"`"
         [ -n "$out" -a -z "$2" ] \
         && mkm find commandtpl --system $1 \
