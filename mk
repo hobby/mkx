@@ -57,6 +57,7 @@
 #     2016/03/25: 支持makefile-tpl-path配置引用shell变量(例如$HOME)
 #     2016/04/13: 支持精确识别编译命令，避免无法正常生成依赖问题
 #                 (含有-c开关选项，而不是只含有-c关键字的命令才是编译命令)
+#     2016/06/18: 支持允许makefile不存在默认输出目标(OUTPUT)变量
 #
 ###########################################################################
 
@@ -175,11 +176,6 @@ if [ -z "$cmdline_targets" ] ; then
     output="`mkm get config output-name OUTPUT`"
     length="$((${#output} + 4))"
     makefile_targets="`echo "$makedata" | grep "^$output =" | cut -c$length-`"
-    if [ -z "$makefile_targets" ] ; then
-        mklog error "targets not found, make args:[$cmdline_options]," \
-                    "output-name:[$output], length:[$length]"
-        fail_exit
-    fi
     cmdline_targets="$makefile_targets"
 fi
 
