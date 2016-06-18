@@ -1,0 +1,62 @@
+#!/usr/bin/expect --
+# vim:ts=4:sw=4:expandtab
+
+#######################################################################
+# NAME
+#     mksu - a toy for su with command
+#
+# SYNOPSIS
+#     mksu username password command
+#
+# AUTHORS
+#     neiku project <ku7d@qq.com> 
+#
+# SEE ALSO
+#     su
+#     expect --help
+#
+# VERSION
+#     2016/06/18: 支持使用su命令切换用户后执行命令
+#
+#######################################################################
+
+set username "[lindex $argv 0]"
+set password "[lindex $argv 1]"
+set command  "[lindex $argv 2]"
+set timeout  -1
+
+if { $command == "" } {
+    send_user "usage: mksu username password command\n"
+    exit
+}
+
+if { $password == "" } {
+    # when MKX_MKSU_PASSWORD not exist
+    # expect will throw expection (to exit)
+    # now we catch and ignore it (password still empty)
+    catch { set password "$env(MKX_MKSU_PASSWORD)" }
+}
+
+send_user "run '$command' with $username\n"
+
+set env(LC_CTYPE) en
+spawn -noecho su $username --command=$command
+expect {
+    # ask for password
+    "*assword:" {
+        send "$password\r"
+    }
+
+    # for command done
+    eof {
+        exit
+    }
+
+    # error occurred, then exit
+    "su" {
+        exit
+    }
+}
+
+expect eof
+exit

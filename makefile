@@ -6,6 +6,7 @@ output = mk mkc \
          mkm \
          mkscpto mkssh \
          mkx_completion.sh \
+         mksu \
 
 profile = mkx_completion.sh \
 

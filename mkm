@@ -19,8 +19,10 @@
 #     mkm find module [ --global | --system ]
 #     mkm del  module [ --global | --system ] modules...
 #     mkm add  module [ --global | --system ] module-name local
-#     mkm add  module [ --global | --system ] module-name rsa    username rsapkey-path hostname hostport
-#     mkm add  module [ --global | --system ] module-name passwd username password     hostname hostport
+#     mkm add  module [ --global | --system ] module-name rsa    username  rsapkey-path hostname  hostport
+#     mkm add  module [ --global | --system ] module-name passwd username  password     hostname  hostport
+#     mkm add  module [ --global | --system ] module-name custom [config3] [config4]    [config5] [config6]
+#     mkm add  module [ --global | --system ] module-name su     username  password     hostname  hostport
 #
 #     mkm path config [ --global | --system ]
 #     mkm list config [ --global | --system ]
@@ -72,6 +74,7 @@
 #     2016/05/28: 支持使用反斜杠作为多行配置的续行符
 #                 ( \\\\ 在两个反引号之间等价于 \\ )
 #                 ( targetreg 不支持多行配置 )
+#     2016/06/18: 支持su module(module type = su)
 #
 ############################################################
 
@@ -119,8 +122,10 @@ function showhelp()
     echo "    mkm find module [ --global | --system ] module"
     echo "    mkm del  module [ --global | --system ] modules..."
     echo "    mkm add  module [ --global | --system ] module-name local"
-    echo "    mkm add  module [ --global | --system ] module-name rsa    username rsapkey-path hostname hostport"
-    echo "    mkm add  module [ --global | --system ] module-name passwd username password     hostname hostport"
+    echo "    mkm add  module [ --global | --system ] module-name rsa    username  rsapkey-path hostname  hostport"
+    echo "    mkm add  module [ --global | --system ] module-name passwd username  password     hostname  hostport"
+    echo "    mkm add  module [ --global | --system ] module-name custom [config3] [config4]    [config5] [config6]"
+    echo "    mkm add  module [ --global | --system ] module-name su     username  password"
     echo
     echo "    mkm path config [ --global | --system ]"
     echo "    mkm list config [ --global | --system ]"
@@ -326,9 +331,14 @@ if [ $mod = "module" ] ; then
             exit
         fi
         [ $# -lt 2 ] && showhelp && exit 1
-        [ "$2" != "rsa" -a "$2" != "local" -a "$2" != "passwd" -a "$2" != "custom" ] && showhelp && exit 1
+        [    "$2" != "rsa"    \
+          -a "$2" != "local"  \
+          -a "$2" != "passwd" \
+          -a "$2" != "custom" \
+          -a "$2" != "su"     ] && showhelp && exit 1
         [ "$2" = "rsa" -a $# -lt 6 ] && showhelp && exit 1
         [ "$2" = "passwd" -a $# -lt 6 ] && showhelp && exit 1
+        [ "$2" = "su" -a $# -lt 2 ] && showhelp && exit 1
         echo "$*" >> "$path" \
         && mklog normal "add project($path) module succ" \
         || mklog error "add project($path) module fail"

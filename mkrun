@@ -49,6 +49,7 @@
 #     2016/05/01: 支持透传-m/-d选项给mkrun(处理alias命令)
 #                 支持自定义module(module type = custom)
 #                 (custom-runner 配置自定义命令执行工具)
+#     2016/06/18: 支持su module(module type = su)
 #
 ##################################################################
 
@@ -198,9 +199,10 @@ do
     if [   "$mtype" != "rsa"    \
         -a "$mtype" != "local"  \
         -a "$mtype" != "passwd" \
-        -a "$mtype" != "custom" ] ; then
+        -a "$mtype" != "custom" \
+        -a "$mtype" != "su" ] ; then
         mklog error "module type unsupported, type:[$mtype]," \
-                    "supported type:[rsa, local, passwd, custom], target:[$target]"
+                    "supported type:[rsa, local, passwd, custom, su], target:[$target]"
         continue
     fi
 
@@ -268,9 +270,12 @@ do
                    MKX_CUSTOM_CONFIG6    \
                    MKX_CUSTOM_COMMAND
             ;;
+        su)
+           MKX_MKSU_PASSWORD="$rsapkey" mksu $username "" "$exportcmd; $command"
+            ;;
         *)
             mklog error "module type unsupported, type:[$mtype]," \
-                        "supported type:[rsa, local, passwd]"
+                        "supported type:[rsa, local, passwd, custom, su]"
             exit 1
             ;;
     esac
