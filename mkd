@@ -63,6 +63,7 @@
 #     2016/05/01: 支持透传-m/-d选项给mkrun
 #                 支持自定义module(module type = custom)
 #                 (custom-deployer 配置自定义部署工具)
+#     2016/06/18: 支持MKX_CUSTOM_TARGETPATH一直为绝对路径
 #
 ############################################################
 
@@ -146,8 +147,8 @@ makedir="$cmdline_makedir"
 makefile="$cmdline_makefile"
 
 # wrapper
-succ_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$cmdline_makedir'"; exit 0; }
-fail_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$cmdline_makedir'"; exit 1; }
+succ_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$makedir'"; exit 0; }
+fail_exit() { [ -n "$makedir" ] && echo "mkd: Leaving directory '$makedir'"; exit 1; }
 
 # go into make directory if need
 if [ -n "$makedir" ] ; then
@@ -158,6 +159,9 @@ if [ -n "$makedir" ] ; then
 
     echo "mkd: Entering directory '$makedir'"
     cd "$makedir" || fail_exit
+
+    # keep makedir always abs path
+    makedir="`pwd`"
 fi
 
 # get makefile from cmdline(by user) or make(auto load)
