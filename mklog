@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # vim:ts=4:sw=4:expandtab
 
 ############################################################
@@ -20,6 +20,11 @@
 #                 只有normal日志能输出到STDOUT
 #     2016/01/31: 支持提示级日志(不含换行符)
 #                 tip    -> STDOUT(紫色)
+#     2017/01/16: 支持跨平台
+#                 - mac的bash 3.2.57无彩色输出，新bash覆盖不了
+#                   /bin/bash
+#                 - 通过env程序+PATH变量动态查询bash，控制权
+#                   、准确性都得到保障
 #
 ############################################################
 
@@ -49,5 +54,5 @@ then
     echo -n "`pinktext "$*"`"
 elif [ "$type" = "debug" ]
 then
-    if [ -n "$debug" ] ; then echo "`yellowtext $*`" >&2; fi
+    if [ -n "$debug" ] ; then echo "`yellowtext "$*"`" >&2; fi
 fi
